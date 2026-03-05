@@ -29,13 +29,16 @@ class PlatformApiClient:
         self, method: str, path: str, json_body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.request(
-                method=method,
-                url=url,
-                headers=self._headers(),
-                json=json_body,
-            )
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    headers=self._headers(),
+                    json=json_body,
+                )
+        except httpx.RequestError as exc:
+            raise PlatformApiError(503, f"Platform API unreachable: {exc}") from exc
 
         if response.status_code >= 400:
             message = response.text
