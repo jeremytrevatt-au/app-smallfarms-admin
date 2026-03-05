@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Form, Request
+from fastapi.responses import RedirectResponse
 
 from app.deps import platform_client, templates
 from app.models.forms import HarvestJobForm
@@ -40,6 +41,13 @@ def _render_harvest(
             "import_result": import_result or {},
         },
     )
+
+
+def _redirect_harvest(message: str, level: str = "success") -> RedirectResponse:
+    from urllib.parse import urlencode
+
+    query = urlencode({"message": message, "level": level})
+    return RedirectResponse(url=f"/harvest?{query}", status_code=303)
 
 
 def _sort_preview_results(harvest_result: dict) -> dict:
@@ -265,31 +273,24 @@ async def _run_places_import(
     import_requested_by: str,
     import_target_tenant_code: str,
 ):
-    if not payload_json.strip():
-        return _render_harvest(
-            request,
-            "Import payload JSON is required.",
+    if not import_requested_by.strip() or not import_target_tenant_code.strip():
+        return _redirect_harvest(
+            _with_timestamp(
+                "Import request is invalid. Required: import_requested_by and import_target_tenant_code."
+            ),
             "error",
-            payload_text=payload_json,
         )
+
+    if not payload_json.strip():
+        return _redirect_harvest("Import payload JSON is required.", "error")
 
     try:
         payload = json.loads(payload_json)
     except json.JSONDecodeError:
-        return _render_harvest(
-            request,
-            "Import payload must be valid JSON.",
-            "error",
-            payload_text=payload_json,
-        )
+        return _redirect_harvest("Import payload must be valid JSON.", "error")
 
     if not isinstance(payload, dict):
-        return _render_harvest(
-            request,
-            "Import payload must be a JSON object.",
-            "error",
-            payload_text=payload_json,
-        )
+        return _redirect_harvest("Import payload must be a JSON object.", "error")
 
     if import_requested_by.strip() and "requested_by" not in payload:
         payload["requested_by"] = import_requested_by.strip()
@@ -299,11 +300,9 @@ async def _run_places_import(
     shaped_payload = _shape_import_payload(payload)
     validation_errors = _validate_import_payload(shaped_payload)
     if validation_errors:
-        return _render_harvest(
-            request,
+        return _redirect_harvest(
             _with_timestamp("Import preflight failed: " + "; ".join(validation_errors)),
             "error",
-            payload_text=payload_json,
         )
 
     try:
@@ -322,17 +321,6 @@ async def _run_places_import(
                 f", partial_location_removed={len(partial_location_removed_ids)} "
                 f"provider_place_ids={partial_location_removed_ids}"
             )
-        return _render_harvest(
-            request,
-            _with_timestamp(message),
-            "success",
-            payload_text=payload_json,
-            import_result=result,
-        )
+        return _redirect_harvest(_with_timestamp(message), "success")
     except PlatformApiError as exc:
-        return _render_harvest(
-            request,
-            _with_timestamp(_import_error_message(exc)),
-            "error",
-            payload_text=payload_json,
-        )
+        return _redirect_harvest(_with_timestamp(_import_error_message(exc)), "error")

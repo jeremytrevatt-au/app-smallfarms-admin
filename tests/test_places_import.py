@@ -119,13 +119,27 @@ def test_import_sanitizes_partial_location(monkeypatch):
     assert captured["payload"]["candidates"][1]["location"]["lng"] == 144.9
 
 
-def test_import_preflight_reports_offending_provider_ids():
+def test_import_preflight_reports_missing_top_level_fields():
     response = client.post(
         "/places/import/commit",
         data={
             "payload_json": '{"candidates":[{"provider_place_id":"bad-1","display_name":""}]}',
             "import_requested_by": "",
             "import_target_tenant_code": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Import request is invalid. Required: import_requested_by and import_target_tenant_code." in response.text
+
+
+def test_import_preflight_reports_offending_provider_ids():
+    response = client.post(
+        "/places/import/commit",
+        data={
+            "payload_json": '{"candidates":[{"provider_place_id":"bad-1","display_name":""}]}',
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
         },
     )
 
