@@ -99,7 +99,9 @@
     <label>Import Requested By</label>
     <input id="import-requested-by" name="import_requested_by" required placeholder="e.g. admin@smallfarms.com.au">
     <label>Target Tenant Code</label>
-    <input id="import-target-tenant-code" name="import_target_tenant_code" required placeholder="e.g. naturalyield">
+    <input id="import-target-tenant-code" name="import_target_tenant_code" required value="tenant_smallfarms" readonly>
+    <label>Default Primary Category Code</label>
+    <input id="import-default-primary-category-code" name="import_default_primary_category_code" required value="microgreens" placeholder="e.g. microgreens">
     <p id="selected-count-label">Selected candidates: 0</p>
     <div class="button-row">
       <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Selected</button>
@@ -118,7 +120,9 @@
       <label>Import Requested By</label>
       <input name="import_requested_by" required placeholder="e.g. admin@smallfarms.com.au">
       <label>Target Tenant Code</label>
-      <input name="import_target_tenant_code" required placeholder="e.g. naturalyield">
+      <input name="import_target_tenant_code" required value="tenant_smallfarms" readonly>
+      <label>Default Primary Category Code</label>
+      <input name="import_default_primary_category_code" required value="microgreens" placeholder="e.g. microgreens">
       <div class="button-row">
         <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Import</button>
         <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Import</button>
@@ -173,6 +177,7 @@
   const selectedImportForm = document.getElementById("selected-import-form");
   const importRequestedByInput = document.getElementById("import-requested-by");
   const importTargetTenantCodeInput = document.getElementById("import-target-tenant-code");
+  const importDefaultPrimaryCategoryCodeInput = document.getElementById("import-default-primary-category-code");
   const selectAllBtn = document.getElementById("select-all-preview");
   const selectNoneBtn = document.getElementById("select-none-preview");
   const previewTypeFilters = document.getElementById("preview-type-filters");
@@ -256,16 +261,26 @@
 
   function rebuildSelectedPayload() {
     const selected = selectedCandidates();
+    const defaultPrimaryCategoryCode = (importDefaultPrimaryCategoryCodeInput?.value || "").trim();
     selectedCountLabel.textContent = `Selected candidates: ${selected.length}`;
     const hasExistingSelected = selectionInputs
       .filter((input) => input.checked)
       .some((input) => existsInDatabaseByIndex(parseInt(input.value, 10)));
     existingSelectionWarning.style.display = hasExistingSelected ? "" : "none";
+    const mappedCandidates = selected.map((candidate) => ({
+      provider_place_id: candidate.provider_place_id || "",
+      display_name: candidate.display_name || candidate.name || "",
+      primary_category_code: candidate.primary_category_code || defaultPrimaryCategoryCode,
+      location: candidate.location || null,
+      raw_payload: candidate.raw_payload || candidate,
+    }));
+
     selectedPayloadInput.value = JSON.stringify(
       {
         requested_by: (importRequestedByInput?.value || "").trim(),
         target_tenant_code: (importTargetTenantCodeInput?.value || "").trim(),
-        candidates: selected,
+        default_primary_category_code: defaultPrimaryCategoryCode,
+        candidates: mappedCandidates,
       },
       null,
       2
@@ -274,6 +289,7 @@
   }
 
   selectionInputs.forEach((input) => input.addEventListener("change", rebuildSelectedPayload));
+  importDefaultPrimaryCategoryCodeInput?.addEventListener("input", rebuildSelectedPayload);
   selectAllBtn?.addEventListener("click", () => {
     selectionInputs.forEach((input) => {
       const row = rowByIndex(parseInt(input.value, 10));

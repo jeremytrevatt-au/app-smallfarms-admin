@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 
 router = APIRouter()
+TENANT_SMALLFARMS = "tenant_smallfarms"
 
 
 def _utc_now_label() -> str:
@@ -61,38 +62,9 @@ def _sort_preview_results(harvest_result: dict) -> dict:
     return updated
 
 
-def _sanitize_import_payload(payload: dict) -> tuple[dict, list[str]]:
-    candidates = payload.get("candidates")
-    if not isinstance(candidates, list):
-        return payload, []
-
-    sanitized_candidates: list[dict] = []
-    partial_location_removed_ids: list[str] = []
-    for item in candidates:
-        if not isinstance(item, dict):
-            sanitized_candidates.append(item)
-            continue
-
-        candidate = dict(item)
-        location = candidate.get("location")
-        if isinstance(location, dict):
-            has_lat = location.get("lat") is not None
-            has_lng = location.get("lng") is not None
-            if has_lat and has_lng:
-                pass
-            elif has_lat or has_lng:
-                candidate.pop("location", None)
-                provider_id = str(candidate.get("provider_place_id", "unknown"))
-                partial_location_removed_ids.append(provider_id)
-        sanitized_candidates.append(candidate)
-
-    updated = dict(payload)
-    updated["candidates"] = sanitized_candidates
-    return updated, partial_location_removed_ids
-
-
 def _shape_import_payload(payload: dict) -> dict:
     shaped = dict(payload)
+    default_primary_category_code = str(shaped.get("default_primary_category_code", "")).strip()
     candidates = shaped.get("candidates")
     if not isinstance(candidates, list):
         return shaped
@@ -104,8 +76,13 @@ def _shape_import_payload(payload: dict) -> dict:
         candidate = dict(item)
         if not candidate.get("display_name"):
             candidate["display_name"] = candidate.get("name", "")
+        if not candidate.get("primary_category_code") and default_primary_category_code:
+            candidate["primary_category_code"] = default_primary_category_code
+        if not candidate.get("raw_payload"):
+            candidate["raw_payload"] = dict(item)
         candidate.pop("exists_in_database", None)
         candidate.pop("existing_listing_id", None)
+        candidate.pop("name", None)
         mapped_candidates.append(candidate)
 
     shaped["candidates"] = mapped_candidates
@@ -118,6 +95,8 @@ def _validate_import_payload(payload: dict) -> list[str]:
         errors.append("missing top-level field: requested_by")
     if not str(payload.get("target_tenant_code", "")).strip():
         errors.append("missing top-level field: target_tenant_code")
+    elif str(payload.get("target_tenant_code", "")).strip() != TENANT_SMALLFARMS:
+        errors.append(f"target_tenant_code must be {TENANT_SMALLFARMS}")
 
     candidates = payload.get("candidates")
     if not isinstance(candidates, list) or not candidates:
@@ -133,6 +112,16 @@ def _validate_import_payload(payload: dict) -> list[str]:
             errors.append(f"candidate {provider_id}: missing display_name")
         if not str(item.get("provider_place_id", "")).strip():
             errors.append(f"candidate {provider_id}: missing provider_place_id")
+        if not str(item.get("primary_category_code", "")).strip():
+            errors.append(f"candidate {provider_id}: missing primary_category_code")
+        location = item.get("location")
+        if not isinstance(location, dict):
+            errors.append(f"candidate {provider_id}: missing location")
+            continue
+        has_lat = location.get("lat") is not None
+        has_lng = location.get("lng") is not None
+        if not has_lat or not has_lng:
+            errors.append(f"candidate {provider_id}: location.lat and location.lng are required together")
     return errors
 
 
@@ -240,6 +229,7 @@ async def import_places_dry_run(
     payload_json: str = Form(""),
     import_requested_by: str = Form(""),
     import_target_tenant_code: str = Form(""),
+    import_default_primary_category_code: str = Form(""),
 ):
     return await _run_places_import(
         request,
@@ -247,6 +237,7 @@ async def import_places_dry_run(
         dry_run=True,
         import_requested_by=import_requested_by,
         import_target_tenant_code=import_target_tenant_code,
+        import_default_primary_category_code=import_default_primary_category_code,
     )
 
 
@@ -256,6 +247,7 @@ async def import_places_commit(
     payload_json: str = Form(""),
     import_requested_by: str = Form(""),
     import_target_tenant_code: str = Form(""),
+    import_default_primary_category_code: str = Form(""),
 ):
     return await _run_places_import(
         request,
@@ -263,6 +255,7 @@ async def import_places_commit(
         dry_run=False,
         import_requested_by=import_requested_by,
         import_target_tenant_code=import_target_tenant_code,
+        import_default_primary_category_code=import_default_primary_category_code,
     )
 
 
@@ -272,6 +265,7 @@ async def _run_places_import(
     dry_run: bool,
     import_requested_by: str,
     import_target_tenant_code: str,
+    import_default_primary_category_code: str,
 ):
     if not import_requested_by.strip() or not import_target_tenant_code.strip():
         return _redirect_harvest(
@@ -294,8 +288,9 @@ async def _run_places_import(
 
     if import_requested_by.strip() and "requested_by" not in payload:
         payload["requested_by"] = import_requested_by.strip()
-    if import_target_tenant_code.strip() and "target_tenant_code" not in payload:
-        payload["target_tenant_code"] = import_target_tenant_code.strip()
+    payload["target_tenant_code"] = TENANT_SMALLFARMS
+    if import_default_primary_category_code.strip() and "default_primary_category_code" not in payload:
+        payload["default_primary_category_code"] = import_default_primary_category_code.strip()
 
     shaped_payload = _shape_import_payload(payload)
     validation_errors = _validate_import_payload(shaped_payload)
@@ -306,8 +301,7 @@ async def _run_places_import(
         )
 
     try:
-        sanitized_payload, partial_location_removed_ids = _sanitize_import_payload(shaped_payload)
-        result = await platform_client.import_places(sanitized_payload, dry_run=dry_run)
+        result = await platform_client.import_places(shaped_payload, dry_run=dry_run)
         inserted_count = result.get("inserted_count", 0)
         updated_count = result.get("updated_count", 0)
         outcomes = result.get("outcomes", [])
@@ -316,11 +310,6 @@ async def _run_places_import(
             f"dry_run={mode} import completed: inserted_count={inserted_count}, "
             f"updated_count={updated_count}, outcomes={outcomes}"
         )
-        if partial_location_removed_ids:
-            message += (
-                f", partial_location_removed={len(partial_location_removed_ids)} "
-                f"provider_place_ids={partial_location_removed_ids}"
-            )
         return _redirect_harvest(_with_timestamp(message), "success")
     except PlatformApiError as exc:
         return _redirect_harvest(_with_timestamp(_import_error_message(exc)), "error")
