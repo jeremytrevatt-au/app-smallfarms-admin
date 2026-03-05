@@ -19,7 +19,7 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
     response = client.post(
         "/harvest/jobs",
         data={
-            "source": "microgreens shop melbourne",
+            "query_text": "microgreens shop melbourne",
             "search_scope": "directory_preview",
             "category_codes_csv": "produce,flowers",
             "max_requests": "10",
@@ -32,6 +32,7 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
 
     assert response.status_code == 200
     assert captured["payload"] is not None
+    assert captured["payload"]["query_text"] == "microgreens shop melbourne"
     assert captured["payload"]["search_scope"] == "directory_preview"
     assert captured["payload"]["category_codes"] == ["produce", "flowers"]
     assert captured["payload"]["max_requests"] == 10
@@ -44,10 +45,11 @@ def test_harvest_preview_missing_fields_returns_validation_message():
     response = client.post(
         "/harvest/jobs",
         data={
-            "source": "microgreens shop melbourne",
+            "query_text": "",
             "note": "",
         },
     )
 
     assert response.status_code == 200
     assert "Harvest request is invalid. Required:" in response.text
+    assert "query_text" in response.text

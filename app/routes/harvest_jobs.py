@@ -58,7 +58,7 @@ async def harvest_page(request: Request, message: str = "", level: str = "succes
 @router.post("/harvest/jobs", include_in_schema=False)
 async def create_harvest_job(
     request: Request,
-    source: str = Form(""),
+    query_text: str = Form(""),
     note: str = Form(""),
     search_scope: str = Form(""),
     category_codes_csv: str = Form(""),
@@ -68,7 +68,7 @@ async def create_harvest_job(
     requested_by: str = Form(""),
 ):
     if (
-        not source.strip()
+        not query_text.strip()
         or not search_scope.strip()
         or not category_codes_csv.strip()
         or not max_requests.strip()
@@ -79,7 +79,7 @@ async def create_harvest_job(
         return _render_harvest(
             request,
             _with_timestamp(
-                "Harvest request is invalid. Required: source, search_scope, category_codes, "
+                "Harvest request is invalid. Required: query_text, search_scope, category_codes, "
                 "max_requests, max_runtime_minutes, priority_code, requested_by."
             ),
             "error",
@@ -88,7 +88,7 @@ async def create_harvest_job(
     category_codes = [item.strip() for item in category_codes_csv.split(",") if item.strip()]
     try:
         form = HarvestJobForm(
-            source=source,
+            query_text=query_text,
             note=note,
             search_scope=search_scope,
             category_codes=category_codes,
@@ -101,7 +101,7 @@ async def create_harvest_job(
         return _render_harvest(
             request,
             _with_timestamp(
-                "Harvest request is invalid. Required: source, search_scope, category_codes, "
+                "Harvest request is invalid. Required: query_text, search_scope, category_codes, "
                 "max_requests, max_runtime_minutes, priority_code, requested_by."
             ),
             "error",
@@ -116,7 +116,7 @@ async def create_harvest_job(
     try:
         harvest_result = await platform_client.create_harvest_job(
             {
-                "source": form.source,
+                "query_text": form.query_text,
                 "note": form.note,
                 "search_scope": form.search_scope,
                 "category_codes": form.category_codes,
