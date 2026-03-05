@@ -44,6 +44,17 @@
 <section class="card">
   <h3>Step 2 and 3: Import selected candidates</h3>
   {% if harvest_result and harvest_result.get("preview_results") %}
+  <div class="button-row">
+    <span id="candidate-summary" class="summary-chip">new: 0, existing: 0</span>
+    <span id="existing-selection-warning" class="summary-chip warning" style="display:none;">Existing listings selected for import</span>
+  </div>
+  <h4>Filter by Existence</h4>
+  <div class="button-row">
+    <button type="button" id="existence-filter-all" class="btn">All</button>
+    <button type="button" id="existence-filter-new" class="btn btn-success">New Only</button>
+    <button type="button" id="existence-filter-existing" class="btn btn-secondary">Existing Only</button>
+  </div>
+
   <h4>Filter by Types</h4>
   <div id="preview-type-filters" class="button-row"></div>
   <div class="button-row">
@@ -64,16 +75,20 @@
         <th>Address</th>
         <th>Types</th>
         <th>Provider Place ID</th>
+        <th>Exists In Database</th>
+        <th>Existing Listing ID</th>
       </tr>
     </thead>
     <tbody>
       {% for item in harvest_result.get("preview_results", []) %}
-      <tr class="preview-row" data-index="{{ loop.index0 }}">
-        <td><input class="preview-select" type="checkbox" value="{{ loop.index0 }}" checked></td>
+      <tr class="preview-row" data-index="{{ loop.index0 }}" data-exists="{{ 1 if item.get('exists_in_database') else 0 }}">
+        <td><input class="preview-select" type="checkbox" value="{{ loop.index0 }}" {% if not item.get("exists_in_database") %}checked{% endif %}></td>
         <td>{{ item.get("name", "-") }}</td>
         <td>{{ item.get("formatted_address", "-") }}</td>
         <td>{{ item.get("types", []) | join(", ") }}</td>
         <td>{{ item.get("provider_place_id", "-") }}</td>
+        <td>{% if item.get("exists_in_database") %}Yes{% else %}No{% endif %}</td>
+        <td>{{ item.get("existing_listing_id", "-") }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -153,6 +168,12 @@
   const previewTypeFilters = document.getElementById("preview-type-filters");
   const typesSelectAllBtn = document.getElementById("types-select-all");
   const typesSelectNoneBtn = document.getElementById("types-select-none");
+  const existenceFilterAllBtn = document.getElementById("existence-filter-all");
+  const existenceFilterNewBtn = document.getElementById("existence-filter-new");
+  const existenceFilterExistingBtn = document.getElementById("existence-filter-existing");
+  const candidateSummary = document.getElementById("candidate-summary");
+  const existingSelectionWarning = document.getElementById("existing-selection-warning");
+  let activeExistenceFilter = "all";
 
   function selectedCandidates() {
     return selectionInputs
@@ -167,13 +188,41 @@
       .map((input) => input.value);
   }
 
+  function rowByIndex(index) {
+    return previewRows.find((row) => parseInt(row.getAttribute("data-index"), 10) === index);
+  }
+
+  function existsInDatabaseByIndex(index) {
+    const row = rowByIndex(index);
+    return row ? row.getAttribute("data-exists") === "1" : false;
+  }
+
+  function updateCandidateSummary() {
+    let newCount = 0;
+    let existingCount = 0;
+    previewRows.forEach((row) => {
+      if (row.getAttribute("data-exists") === "1") {
+        existingCount += 1;
+      } else {
+        newCount += 1;
+      }
+    });
+    candidateSummary.textContent = `new: ${newCount}, existing: ${existingCount}`;
+  }
+
   function applyTypeFilters() {
     const activeTypes = activeTypeFilters();
     previewRows.forEach((row) => {
       const idx = parseInt(row.getAttribute("data-index"), 10);
       const item = previewResults[idx] || {};
       const itemTypes = Array.isArray(item.types) ? item.types : [];
-      const visible = activeTypes.length === 0 || itemTypes.some((t) => activeTypes.includes(t));
+      const typeVisible = activeTypes.length === 0 || itemTypes.some((t) => activeTypes.includes(t));
+      const exists = row.getAttribute("data-exists") === "1";
+      const existenceVisible =
+        activeExistenceFilter === "all" ||
+        (activeExistenceFilter === "new" && !exists) ||
+        (activeExistenceFilter === "existing" && exists);
+      const visible = typeVisible && existenceVisible;
       row.style.display = visible ? "" : "none";
       const checkbox = row.querySelector(".preview-select");
       if (!visible && checkbox) checkbox.checked = false;
@@ -198,13 +247,22 @@
   function rebuildSelectedPayload() {
     const selected = selectedCandidates();
     selectedCountLabel.textContent = `Selected candidates: ${selected.length}`;
+    const hasExistingSelected = selectionInputs
+      .filter((input) => input.checked)
+      .some((input) => existsInDatabaseByIndex(parseInt(input.value, 10)));
+    existingSelectionWarning.style.display = hasExistingSelected ? "" : "none";
     selectedPayloadInput.value = JSON.stringify({ candidates: selected }, null, 2);
     return selected.length;
   }
 
   selectionInputs.forEach((input) => input.addEventListener("change", rebuildSelectedPayload));
   selectAllBtn?.addEventListener("click", () => {
-    selectionInputs.forEach((input) => { input.checked = true; });
+    selectionInputs.forEach((input) => {
+      const row = rowByIndex(parseInt(input.value, 10));
+      if (row && row.style.display !== "none") {
+        input.checked = true;
+      }
+    });
     rebuildSelectedPayload();
   });
   selectNoneBtn?.addEventListener("click", () => {
@@ -219,6 +277,18 @@
     document.querySelectorAll(".preview-type-filter").forEach((input) => { input.checked = false; });
     applyTypeFilters();
   });
+  existenceFilterAllBtn?.addEventListener("click", () => {
+    activeExistenceFilter = "all";
+    applyTypeFilters();
+  });
+  existenceFilterNewBtn?.addEventListener("click", () => {
+    activeExistenceFilter = "new";
+    applyTypeFilters();
+  });
+  existenceFilterExistingBtn?.addEventListener("click", () => {
+    activeExistenceFilter = "existing";
+    applyTypeFilters();
+  });
 
   selectedImportForm?.addEventListener("submit", (event) => {
     const count = rebuildSelectedPayload();
@@ -229,6 +299,7 @@
   });
 
   renderTypeFilterControls();
+  updateCandidateSummary();
   applyTypeFilters();
   rebuildSelectedPayload();
 </script>

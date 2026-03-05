@@ -152,6 +152,19 @@ pre {
   color: #b71c1c;
 }
 
+.summary-chip {
+  background: #e3f2fd;
+  color: #0d47a1;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+.summary-chip.warning {
+  background: #fff3e0;
+  color: #e65100;
+}
+
 @media (max-width: 950px) {
   .grid-3 {
     grid-template-columns: 1fr;
