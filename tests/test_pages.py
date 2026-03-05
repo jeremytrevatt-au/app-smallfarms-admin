@@ -44,3 +44,10 @@ def test_header_contains_tag_nav_links():
     assert response.status_code == 200
     assert "Tags" in response.text
     assert "Listing Tags" in response.text
+    assert "Listings" in response.text
+
+
+def test_listing_management_page_loads():
+    response = client.get("/listings/manage")
+    assert response.status_code == 200
+    assert "Listing Lifecycle Management" in response.text

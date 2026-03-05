@@ -8,6 +8,7 @@ from app.routes import (
     billing_subscriptions,
     harvest_jobs,
     home,
+    listing_management,
     listing_tag_assignments,
     moderation_approve,
     moderation_claim,
@@ -36,4 +37,5 @@ app.include_router(billing_subscriptions.router)
 app.include_router(harvest_jobs.router)
 app.include_router(tags_governance.router)
 app.include_router(listing_tag_assignments.router)
+app.include_router(listing_management.router)
 app.include_router(api_logs.router)

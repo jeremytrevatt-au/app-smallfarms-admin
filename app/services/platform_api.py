@@ -222,3 +222,43 @@ class PlatformApiClient:
             },
         )
 
+    async def patch_admin_listing(
+        self,
+        listing_id: str,
+        requested_by: str,
+        reason_code: str,
+        display_name: str = "",
+        primary_category_code: str = "",
+        status_code: str = "",
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "requested_by": requested_by,
+            "reason_code": reason_code,
+        }
+        if display_name.strip():
+            payload["display_name"] = display_name.strip()
+        if primary_category_code.strip():
+            payload["primary_category_code"] = primary_category_code.strip()
+        if status_code.strip():
+            payload["status_code"] = status_code.strip()
+        return await self._request(
+            "PATCH",
+            f"/v1/admin/listings/{listing_id}",
+            payload,
+        )
+
+    async def delete_admin_listing(
+        self,
+        listing_id: str,
+        requested_by: str,
+        reason_code: str,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "DELETE",
+            f"/v1/admin/listings/{listing_id}",
+            {
+                "requested_by": requested_by,
+                "reason_code": reason_code,
+            },
+        )
+
