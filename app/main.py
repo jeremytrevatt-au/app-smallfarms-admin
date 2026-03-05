@@ -8,6 +8,7 @@ from app.routes import (
     billing_subscriptions,
     harvest_jobs,
     home,
+    listing_tag_assignments,
     moderation_approve,
     moderation_claim,
     moderation_escalate,
@@ -15,6 +16,7 @@ from app.routes import (
     moderation_request_changes,
     moderation_resolve_escalation,
     moderation_submissions,
+    tags_governance,
 )
 
 
@@ -32,4 +34,6 @@ app.include_router(moderation_resolve_escalation.router)
 app.include_router(audit_events.router)
 app.include_router(billing_subscriptions.router)
 app.include_router(harvest_jobs.router)
+app.include_router(tags_governance.router)
+app.include_router(listing_tag_assignments.router)
 app.include_router(api_logs.router)

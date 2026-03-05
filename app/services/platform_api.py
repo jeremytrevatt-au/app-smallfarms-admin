@@ -195,3 +195,30 @@ class PlatformApiClient:
             payload,
         )
 
+    async def upsert_tags(self, requested_by: str, tags: list[dict[str, Any]]) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/v1/admin/tags",
+            {
+                "requested_by": requested_by,
+                "tags": tags,
+            },
+        )
+
+    async def replace_listing_tag_assignments(
+        self,
+        listing_id: str,
+        tag_codes: list[str],
+        reason_code: str,
+        requested_by: str,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            f"/v1/admin/listings/{listing_id}/tag-assignments",
+            {
+                "tag_codes": tag_codes,
+                "reason_code": reason_code,
+                "requested_by": requested_by,
+            },
+        )
+

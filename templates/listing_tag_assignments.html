@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Listing Tag Assignments</h2>
+  <p>Replace active listing tags using canonical tag codes only.</p>
+  {% if message %}
+    <div class="alert {{ level }}">{{ message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <form method="post" action="/listing-tags" class="action-form">
+    <label>Listing ID</label>
+    <input name="listing_id" value="{{ listing_id }}" required placeholder="listing-123">
+    <label>Tag Codes (comma separated)</label>
+    <input name="tag_codes_csv" value="{{ tag_codes_csv }}" required placeholder="microgreens,flowers">
+    <label>Reason Code</label>
+    <input name="reason_code" value="{{ reason_code }}" required placeholder="ADMIN_TAXONOMY_UPDATE">
+    <label>Requested By</label>
+    <input name="requested_by" value="{{ requested_by }}" required placeholder="admin@smallfarms">
+    <button type="submit" class="btn">Replace Tag Assignments</button>
+  </form>
+</section>
+
+{% if result %}
+<section class="card">
+  <h3>Response</h3>
+  <pre>{{ result | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+{% endblock %}

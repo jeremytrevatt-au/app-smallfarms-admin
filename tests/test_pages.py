@@ -37,3 +37,10 @@ def test_api_logs_page_loads():
     response = client.get("/api-logs")
     assert response.status_code == 200
     assert "API POST Logs" in response.text
+
+
+def test_header_contains_tag_nav_links():
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert "Tags" in response.text
+    assert "Listing Tags" in response.text

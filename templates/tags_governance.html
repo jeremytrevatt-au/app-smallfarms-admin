@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Canonical Tag Governance</h2>
+  <p>Manage controlled-vocabulary tags via platform contracts.</p>
+  {% if message %}
+    <div class="alert {{ level }}">{{ message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <form method="post" action="/tags" class="action-form">
+    <label>Requested By</label>
+    <input name="requested_by" value="{{ requested_by }}" required placeholder="admin@smallfarms">
+    <label>Tags JSON Array</label>
+    <textarea name="tags_json" rows="12">{{ tags_json }}</textarea>
+    <button type="submit" class="btn">Upsert Canonical Tags</button>
+  </form>
+</section>
+
+{% if result %}
+<section class="card">
+  <h3>Response</h3>
+  <pre>{{ result | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+{% endblock %}
