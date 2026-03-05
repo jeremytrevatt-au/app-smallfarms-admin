@@ -11,8 +11,20 @@
 <section class="card">
   <h3>Step 1: Preview candidates</h3>
   <form method="post" action="/harvest/jobs" class="action-form">
-    <label>Source</label>
-    <input name="source" required placeholder="e.g. places-sync-preview">
+    <label>Source Query</label>
+    <input name="source" required placeholder="e.g. microgreens shop melbourne">
+    <label>Search Scope</label>
+    <input name="search_scope" required value="directory_preview" placeholder="e.g. directory_preview">
+    <label>Category Codes (comma separated)</label>
+    <input name="category_codes_csv" required placeholder="e.g. produce,flowers">
+    <label>Max Requests</label>
+    <input name="max_requests" type="number" min="1" max="500" required value="10">
+    <label>Max Runtime Minutes</label>
+    <input name="max_runtime_minutes" type="number" min="1" max="120" required value="5">
+    <label>Priority Code</label>
+    <input name="priority_code" required value="normal" placeholder="e.g. normal">
+    <label>Requested By</label>
+    <input name="requested_by" required placeholder="e.g. admin@smallfarms">
     <label>Note</label>
     <textarea name="note" placeholder="Optional run context"></textarea>
     <button type="submit" class="btn">Run Preview</button>

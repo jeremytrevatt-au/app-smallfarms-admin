@@ -56,14 +56,76 @@ async def harvest_page(request: Request, message: str = "", level: str = "succes
 
 
 @router.post("/harvest/jobs", include_in_schema=False)
-async def create_harvest_job(request: Request, source: str = Form(""), note: str = Form("")):
+async def create_harvest_job(
+    request: Request,
+    source: str = Form(""),
+    note: str = Form(""),
+    search_scope: str = Form(""),
+    category_codes_csv: str = Form(""),
+    max_requests: str = Form(""),
+    max_runtime_minutes: str = Form(""),
+    priority_code: str = Form(""),
+    requested_by: str = Form(""),
+):
+    if (
+        not source.strip()
+        or not search_scope.strip()
+        or not category_codes_csv.strip()
+        or not max_requests.strip()
+        or not max_runtime_minutes.strip()
+        or not priority_code.strip()
+        or not requested_by.strip()
+    ):
+        return _render_harvest(
+            request,
+            _with_timestamp(
+                "Harvest request is invalid. Required: source, search_scope, category_codes, "
+                "max_requests, max_runtime_minutes, priority_code, requested_by."
+            ),
+            "error",
+        )
+
+    category_codes = [item.strip() for item in category_codes_csv.split(",") if item.strip()]
     try:
-        form = HarvestJobForm(source=source, note=note)
+        form = HarvestJobForm(
+            source=source,
+            note=note,
+            search_scope=search_scope,
+            category_codes=category_codes,
+            max_requests=int(max_requests),
+            max_runtime_minutes=int(max_runtime_minutes),
+            priority_code=priority_code,
+            requested_by=requested_by,
+        )
     except ValidationError:
-        return _render_harvest(request, "source is required.", "error")
+        return _render_harvest(
+            request,
+            _with_timestamp(
+                "Harvest request is invalid. Required: source, search_scope, category_codes, "
+                "max_requests, max_runtime_minutes, priority_code, requested_by."
+            ),
+            "error",
+        )
+    except ValueError:
+        return _render_harvest(
+            request,
+            _with_timestamp("max_requests and max_runtime_minutes must be numeric."),
+            "error",
+        )
 
     try:
-        harvest_result = await platform_client.create_harvest_job(form.source, form.note)
+        harvest_result = await platform_client.create_harvest_job(
+            {
+                "source": form.source,
+                "note": form.note,
+                "search_scope": form.search_scope,
+                "category_codes": form.category_codes,
+                "max_requests": form.max_requests,
+                "max_runtime_minutes": form.max_runtime_minutes,
+                "priority_code": form.priority_code,
+                "requested_by": form.requested_by,
+            }
+        )
         return _render_harvest(
             request,
             _with_timestamp("Harvest preview completed. Select candidates for import."),

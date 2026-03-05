@@ -180,11 +180,11 @@ class PlatformApiClient:
     async def list_billing_subscriptions(self) -> dict[str, Any]:
         return await self._request("GET", "/v1/admin/billing/subscriptions")
 
-    async def create_harvest_job(self, source: str, note: str) -> dict[str, Any]:
+    async def create_harvest_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request(
             "POST",
             "/v1/admin/harvest/jobs",
-            {"source": source, "note": note},
+            payload,
         )
 
     async def import_places(self, payload: dict[str, Any], dry_run: bool) -> dict[str, Any]:
