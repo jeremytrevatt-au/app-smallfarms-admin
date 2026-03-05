@@ -7,9 +7,10 @@ from app.config import settings
 
 
 class PlatformApiError(Exception):
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(self, status_code: int, message: str, error_code: str = "") -> None:
         self.status_code = status_code
         self.message = message
+        self.error_code = error_code
         super().__init__(message)
 
 
@@ -42,12 +43,14 @@ class PlatformApiClient:
 
         if response.status_code >= 400:
             message = response.text
+            error_code = ""
             try:
                 body = response.json()
                 message = body.get("message") or body.get("error") or message
+                error_code = body.get("code") or body.get("error_code") or ""
             except ValueError:
                 pass
-            raise PlatformApiError(response.status_code, message)
+            raise PlatformApiError(response.status_code, message, error_code)
 
         if not response.content:
             return {}
@@ -109,5 +112,13 @@ class PlatformApiClient:
             "POST",
             "/v1/admin/harvest/jobs",
             {"source": source, "note": note},
+        )
+
+    async def import_places(self, payload: dict[str, Any], dry_run: bool) -> dict[str, Any]:
+        flag = "true" if dry_run else "false"
+        return await self._request(
+            "POST",
+            f"/v1/admin/places/import?dry_run={flag}",
+            payload,
         )
 

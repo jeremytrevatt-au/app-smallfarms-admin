@@ -25,3 +25,9 @@ def test_billing_page_read_only(monkeypatch):
     response = client.get("/billing")
     assert response.status_code == 200
     assert "Manual entitlement toggles are intentionally not available" in response.text
+
+
+def test_harvest_page_loads():
+    response = client.get("/harvest")
+    assert response.status_code == 200
+    assert "Workflow: run harvest preview, dry-run import selected candidates, then commit import." in response.text

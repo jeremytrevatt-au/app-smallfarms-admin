@@ -2,19 +2,46 @@
 {% block content %}
 <section class="card">
   <h2>Places Preview Operations</h2>
-  <p>Run operational preview jobs using the live admin harvest contract.</p>
+  <p>Workflow: run harvest preview, dry-run import selected candidates, then commit import.</p>
   {% if message %}
     <div class="alert {{ level }}">{{ message }}</div>
   {% endif %}
 </section>
 
 <section class="card">
+  <h3>Step 1: Preview candidates</h3>
   <form method="post" action="/harvest/jobs" class="action-form">
     <label>Source</label>
     <input name="source" required placeholder="e.g. places-sync-preview">
     <label>Note</label>
     <textarea name="note" placeholder="Optional run context"></textarea>
-    <button type="submit" class="btn">Start Harvest Job</button>
+    <button type="submit" class="btn">Run Preview</button>
   </form>
 </section>
+
+<section class="card">
+  <h3>Step 2 and 3: Import selected candidates</h3>
+  <form method="post" class="action-form">
+    <label>Import Payload JSON</label>
+    <textarea name="payload_json" rows="14" placeholder='{"candidates": []}'>{{ payload_text }}</textarea>
+    <div class="button-row">
+      <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Import</button>
+      <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Import</button>
+    </div>
+  </form>
+</section>
+
+{% if harvest_result %}
+<section class="card">
+  <h3>Preview response</h3>
+  <pre>{{ harvest_result | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+
+{% if import_result %}
+<section class="card">
+  <h3>Import response</h3>
+  <pre>{{ import_result | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
 {% endblock %}
