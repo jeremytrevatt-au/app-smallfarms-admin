@@ -22,6 +22,26 @@
     </div>
   </div>
 
+  {% set contact = item.get('admin_contact', {}) %}
+  <h4>Contact Preview</h4>
+  <p>Website: {{ contact.get('website_url') or '-' }}</p>
+  <p>Phone: {{ contact.get('phone_number') or '-' }}</p>
+  <p>
+    Social:
+    {% set social = contact.get('social_urls', {}) %}
+    {% if social and social is mapping %}
+      facebook={{ social.get('facebook') or '-' }},
+      instagram={{ social.get('instagram') or '-' }},
+      youtube={{ social.get('youtube') or '-' }},
+      x={{ social.get('x') or '-' }},
+      tiktok={{ social.get('tiktok') or '-' }},
+      linkedin={{ social.get('linkedin') or '-' }},
+      other={{ social.get('other') or '-' }}
+    {% else %}
+      -
+    {% endif %}
+  </p>
+
   <div class="button-row">
     <form method="post" action="/moderation/{{ item.get('id') }}/claim">
       <button type="submit" class="btn">Claim</button>

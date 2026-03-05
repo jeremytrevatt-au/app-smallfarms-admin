@@ -17,6 +17,54 @@ def test_moderation_page_loads(monkeypatch):
     assert "Moderation Queue" in response.text
 
 
+def test_moderation_page_renders_contact_fields(monkeypatch):
+    async def fake_list_submissions():
+        return {
+            "items": [
+                {
+                    "id": "sub-123",
+                    "status": "pending",
+                    "contact": {
+                        "website_url": "https://examplefarm.com.au",
+                        "phone_number": "+61 3 9000 0000",
+                        "social_urls": {
+                            "facebook": "https://facebook.com/examplefarm",
+                            "instagram": None,
+                        },
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert "Contact Preview" in response.text
+    assert "https://examplefarm.com.au" in response.text
+    assert "+61 3 9000 0000" in response.text
+    assert "https://facebook.com/examplefarm" in response.text
+
+
+def test_moderation_page_renders_nullable_contact_fields(monkeypatch):
+    async def fake_list_submissions():
+        return {
+            "items": [
+                {
+                    "id": "sub-456",
+                    "status": "pending",
+                    "contact": None,
+                }
+            ]
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert "Contact Preview" in response.text
+    assert "Website: -" in response.text
+    assert "Phone: -" in response.text
+
+
 def test_billing_page_read_only(monkeypatch):
     async def fake_subscriptions():
         return {"items": [{"tenant_id": "t-1", "status": "active"}]}
