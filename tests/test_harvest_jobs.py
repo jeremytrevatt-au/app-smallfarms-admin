@@ -12,7 +12,17 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
 
     async def fake_create_harvest_job(payload):
         captured["payload"] = payload
-        return {"job_id": "job-1"}
+        return {
+            "job_id": "job-1",
+            "preview_results": [
+                {
+                    "provider_place_id": "p-1",
+                    "name": "Test Place",
+                    "formatted_address": "123 Test St",
+                    "types": ["produce_store"],
+                }
+            ],
+        }
 
     monkeypatch.setattr(deps.platform_client, "create_harvest_job", fake_create_harvest_job)
 
@@ -39,6 +49,9 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
     assert captured["payload"]["max_runtime_minutes"] == 5
     assert captured["payload"]["priority_code"] == "normal"
     assert captured["payload"]["requested_by"] == "admin@smallfarms"
+    assert "Select All" in response.text
+    assert "Select None" in response.text
+    assert "Dry Run Selected" in response.text
 
 
 def test_harvest_preview_missing_fields_returns_validation_message():

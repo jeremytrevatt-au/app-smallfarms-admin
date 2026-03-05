@@ -33,14 +33,58 @@
 
 <section class="card">
   <h3>Step 2 and 3: Import selected candidates</h3>
-  <form method="post" class="action-form">
-    <label>Import Payload JSON</label>
-    <textarea name="payload_json" rows="14" placeholder='{"candidates": []}'>{{ payload_text }}</textarea>
+  {% if harvest_result and harvest_result.get("preview_results") %}
+  <div class="button-row">
+    <button type="button" id="select-all-preview" class="btn">Select All</button>
+    <button type="button" id="select-none-preview" class="btn btn-secondary">Select None</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Select</th>
+        <th>Name</th>
+        <th>Address</th>
+        <th>Types</th>
+        <th>Provider Place ID</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in harvest_result.get("preview_results", []) %}
+      <tr>
+        <td><input class="preview-select" type="checkbox" value="{{ loop.index0 }}" checked></td>
+        <td>{{ item.get("name", "-") }}</td>
+        <td>{{ item.get("formatted_address", "-") }}</td>
+        <td>{{ item.get("types", []) | join(", ") }}</td>
+        <td>{{ item.get("provider_place_id", "-") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form id="selected-import-form" method="post" class="action-form">
+    <input type="hidden" id="payload_json_selected" name="payload_json">
+    <p id="selected-count-label">Selected candidates: 0</p>
     <div class="button-row">
-      <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Import</button>
-      <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Import</button>
+      <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Selected</button>
+      <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Selected</button>
     </div>
   </form>
+  {% else %}
+  <p>Run a preview first, then select candidates for import.</p>
+  {% endif %}
+
+  <details>
+    <summary>Advanced: Manual Import Payload</summary>
+    <form method="post" class="action-form">
+      <label>Import Payload JSON</label>
+      <textarea name="payload_json" rows="14" placeholder='{"candidates": []}'>{{ payload_text }}</textarea>
+      <div class="button-row">
+        <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Import</button>
+        <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Import</button>
+      </div>
+    </form>
+  </details>
 </section>
 
 {% if harvest_result %}
@@ -55,5 +99,51 @@
   <h3>Import response</h3>
   <pre>{{ import_result | tojson(indent=2) }}</pre>
 </section>
+{% endif %}
+
+{% if harvest_result and harvest_result.get("preview_results") %}
+<script>
+  const previewResults = {{ harvest_result.get("preview_results", []) | tojson }};
+  const selectionInputs = Array.from(document.querySelectorAll(".preview-select"));
+  const selectedCountLabel = document.getElementById("selected-count-label");
+  const selectedPayloadInput = document.getElementById("payload_json_selected");
+  const selectedImportForm = document.getElementById("selected-import-form");
+  const selectAllBtn = document.getElementById("select-all-preview");
+  const selectNoneBtn = document.getElementById("select-none-preview");
+
+  function selectedCandidates() {
+    return selectionInputs
+      .filter((input) => input.checked)
+      .map((input) => previewResults[parseInt(input.value, 10)])
+      .filter(Boolean);
+  }
+
+  function rebuildSelectedPayload() {
+    const selected = selectedCandidates();
+    selectedCountLabel.textContent = `Selected candidates: ${selected.length}`;
+    selectedPayloadInput.value = JSON.stringify({ candidates: selected }, null, 2);
+    return selected.length;
+  }
+
+  selectionInputs.forEach((input) => input.addEventListener("change", rebuildSelectedPayload));
+  selectAllBtn?.addEventListener("click", () => {
+    selectionInputs.forEach((input) => { input.checked = true; });
+    rebuildSelectedPayload();
+  });
+  selectNoneBtn?.addEventListener("click", () => {
+    selectionInputs.forEach((input) => { input.checked = false; });
+    rebuildSelectedPayload();
+  });
+
+  selectedImportForm?.addEventListener("submit", (event) => {
+    const count = rebuildSelectedPayload();
+    if (count === 0) {
+      event.preventDefault();
+      alert("Select at least one candidate before import.");
+    }
+  });
+
+  rebuildSelectedPayload();
+</script>
 {% endif %}
 {% endblock %}
