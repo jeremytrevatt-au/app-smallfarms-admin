@@ -10,6 +10,7 @@ class HarvestJobForm(BaseModel):
     query_text: str = Field(min_length=1, max_length=256)
     note: str = Field(default="", max_length=2000)
     search_scope: str = Field(min_length=1, max_length=128)
+    region_hint: str = Field(default="", max_length=128)
     category_codes: list[str] = Field(min_length=1)
     max_requests: int = Field(ge=1, le=500)
     max_runtime_minutes: int = Field(ge=1, le=120)

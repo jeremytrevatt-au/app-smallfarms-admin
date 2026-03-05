@@ -15,6 +15,8 @@
     <input name="query_text" required placeholder="e.g. microgreens shop melbourne">
     <label>Search Scope</label>
     <input name="search_scope" required value="directory_preview" placeholder="e.g. directory_preview">
+    <label>Region Hint (optional)</label>
+    <input name="region_hint" placeholder="e.g. melbourne">
     <label>Category Codes (comma separated)</label>
     <input name="category_codes_csv" required placeholder="e.g. produce,flowers">
     <label>Max Requests</label>
@@ -88,6 +90,28 @@
 </section>
 
 {% if harvest_result %}
+<section class="card">
+  <h3>Query diagnostics</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Query Text</th>
+        <th>Effective Query Text</th>
+        <th>Query Attempts</th>
+        <th>Provider Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{ harvest_result.get("query_text", "-") }}</td>
+        <td>{{ harvest_result.get("effective_query_text", "-") }}</td>
+        <td>{{ harvest_result.get("query_attempts", "-") }}</td>
+        <td>{{ harvest_result.get("places_provider_status", "-") }}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
 <section class="card">
   <h3>Preview response</h3>
   <pre>{{ harvest_result | tojson(indent=2) }}</pre>

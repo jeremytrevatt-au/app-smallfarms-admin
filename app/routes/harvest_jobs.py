@@ -61,6 +61,7 @@ async def create_harvest_job(
     query_text: str = Form(""),
     note: str = Form(""),
     search_scope: str = Form(""),
+    region_hint: str = Form(""),
     category_codes_csv: str = Form(""),
     max_requests: str = Form(""),
     max_runtime_minutes: str = Form(""),
@@ -91,6 +92,7 @@ async def create_harvest_job(
             query_text=query_text,
             note=note,
             search_scope=search_scope,
+            region_hint=region_hint,
             category_codes=category_codes,
             max_requests=int(max_requests),
             max_runtime_minutes=int(max_runtime_minutes),
@@ -114,18 +116,19 @@ async def create_harvest_job(
         )
 
     try:
-        harvest_result = await platform_client.create_harvest_job(
-            {
-                "query_text": form.query_text,
-                "note": form.note,
-                "search_scope": form.search_scope,
-                "category_codes": form.category_codes,
-                "max_requests": form.max_requests,
-                "max_runtime_minutes": form.max_runtime_minutes,
-                "priority_code": form.priority_code,
-                "requested_by": form.requested_by,
-            }
-        )
+        payload = {
+            "query_text": form.query_text,
+            "note": form.note,
+            "search_scope": form.search_scope,
+            "category_codes": form.category_codes,
+            "max_requests": form.max_requests,
+            "max_runtime_minutes": form.max_runtime_minutes,
+            "priority_code": form.priority_code,
+            "requested_by": form.requested_by,
+        }
+        if form.region_hint.strip():
+            payload["region_hint"] = form.region_hint.strip()
+        harvest_result = await platform_client.create_harvest_job(payload)
         return _render_harvest(
             request,
             _with_timestamp("Harvest preview completed. Select candidates for import."),

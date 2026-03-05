@@ -14,6 +14,10 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
         captured["payload"] = payload
         return {
             "job_id": "job-1",
+            "query_text": "microgreens shop melbourne",
+            "effective_query_text": "microgreens farm melbourne",
+            "query_attempts": 2,
+            "places_provider_status": "OK",
             "preview_results": [
                 {
                     "provider_place_id": "p-1",
@@ -31,6 +35,7 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
         data={
             "query_text": "microgreens shop melbourne",
             "search_scope": "directory_preview",
+            "region_hint": "melbourne",
             "category_codes_csv": "produce,flowers",
             "max_requests": "10",
             "max_runtime_minutes": "5",
@@ -43,6 +48,7 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
     assert response.status_code == 200
     assert captured["payload"] is not None
     assert captured["payload"]["query_text"] == "microgreens shop melbourne"
+    assert captured["payload"]["region_hint"] == "melbourne"
     assert captured["payload"]["search_scope"] == "directory_preview"
     assert captured["payload"]["category_codes"] == ["produce", "flowers"]
     assert captured["payload"]["max_requests"] == 10
@@ -52,6 +58,8 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
     assert "Select All" in response.text
     assert "Select None" in response.text
     assert "Dry Run Selected" in response.text
+    assert "Query diagnostics" in response.text
+    assert "microgreens farm melbourne" in response.text
 
 
 def test_harvest_preview_missing_fields_returns_validation_message():
