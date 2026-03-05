@@ -10,7 +10,7 @@
 
 <section class="card">
   <h3>Step 1: Preview candidates</h3>
-  <form method="post" action="/harvest/jobs" class="action-form">
+  <form id="preview-form" method="post" action="/harvest/jobs" class="action-form">
     <label>Query Text</label>
     <input name="query_text" required placeholder="e.g. microgreens shop melbourne">
     <label>Search Scope</label>
@@ -18,7 +18,15 @@
     <label>Region Hint (optional)</label>
     <input name="region_hint" placeholder="e.g. melbourne">
     <label>Category Codes (comma separated)</label>
-    <input name="category_codes_csv" required placeholder="e.g. produce,flowers">
+    <input id="category-codes-csv" name="category_codes_csv" required placeholder="e.g. produce,flowers">
+    <label>Quick Type Query Options</label>
+    <div class="button-row">
+      <label><input class="query-type-option" type="checkbox" value="microgreens"> microgreens</label>
+      <label><input class="query-type-option" type="checkbox" value="produce"> produce</label>
+      <label><input class="query-type-option" type="checkbox" value="grocery_or_supermarket"> grocery_or_supermarket</label>
+      <label><input class="query-type-option" type="checkbox" value="flowers"> flowers</label>
+      <label><input class="query-type-option" type="checkbox" value="clothing_store"> clothing_store</label>
+    </div>
     <label>Max Requests</label>
     <input name="max_requests" type="number" min="1" max="500" required value="10">
     <label>Max Runtime Minutes</label>
@@ -36,6 +44,13 @@
 <section class="card">
   <h3>Step 2 and 3: Import selected candidates</h3>
   {% if harvest_result and harvest_result.get("preview_results") %}
+  <h4>Filter by Types</h4>
+  <div id="preview-type-filters" class="button-row"></div>
+  <div class="button-row">
+    <button type="button" id="types-select-all" class="btn">All Types</button>
+    <button type="button" id="types-select-none" class="btn btn-secondary">No Types</button>
+  </div>
+
   <div class="button-row">
     <button type="button" id="select-all-preview" class="btn">Select All</button>
     <button type="button" id="select-none-preview" class="btn btn-secondary">Select None</button>
@@ -53,7 +68,7 @@
     </thead>
     <tbody>
       {% for item in harvest_result.get("preview_results", []) %}
-      <tr>
+      <tr class="preview-row" data-index="{{ loop.index0 }}">
         <td><input class="preview-select" type="checkbox" value="{{ loop.index0 }}" checked></td>
         <td>{{ item.get("name", "-") }}</td>
         <td>{{ item.get("formatted_address", "-") }}</td>
@@ -129,17 +144,55 @@
 <script>
   const previewResults = {{ harvest_result.get("preview_results", []) | tojson }};
   const selectionInputs = Array.from(document.querySelectorAll(".preview-select"));
+  const previewRows = Array.from(document.querySelectorAll(".preview-row"));
   const selectedCountLabel = document.getElementById("selected-count-label");
   const selectedPayloadInput = document.getElementById("payload_json_selected");
   const selectedImportForm = document.getElementById("selected-import-form");
   const selectAllBtn = document.getElementById("select-all-preview");
   const selectNoneBtn = document.getElementById("select-none-preview");
+  const previewTypeFilters = document.getElementById("preview-type-filters");
+  const typesSelectAllBtn = document.getElementById("types-select-all");
+  const typesSelectNoneBtn = document.getElementById("types-select-none");
 
   function selectedCandidates() {
     return selectionInputs
       .filter((input) => input.checked)
       .map((input) => previewResults[parseInt(input.value, 10)])
       .filter(Boolean);
+  }
+
+  function activeTypeFilters() {
+    return Array.from(document.querySelectorAll(".preview-type-filter"))
+      .filter((input) => input.checked)
+      .map((input) => input.value);
+  }
+
+  function applyTypeFilters() {
+    const activeTypes = activeTypeFilters();
+    previewRows.forEach((row) => {
+      const idx = parseInt(row.getAttribute("data-index"), 10);
+      const item = previewResults[idx] || {};
+      const itemTypes = Array.isArray(item.types) ? item.types : [];
+      const visible = activeTypes.length === 0 || itemTypes.some((t) => activeTypes.includes(t));
+      row.style.display = visible ? "" : "none";
+      const checkbox = row.querySelector(".preview-select");
+      if (!visible && checkbox) checkbox.checked = false;
+    });
+    rebuildSelectedPayload();
+  }
+
+  function renderTypeFilterControls() {
+    const typeSet = new Set();
+    previewResults.forEach((item) => {
+      (item.types || []).forEach((t) => typeSet.add(t));
+    });
+    const sortedTypes = Array.from(typeSet).sort();
+    previewTypeFilters.innerHTML = sortedTypes
+      .map((type) => `<label><input class="preview-type-filter" type="checkbox" value="${type}" checked> ${type}</label>`)
+      .join("");
+    Array.from(document.querySelectorAll(".preview-type-filter")).forEach((input) => {
+      input.addEventListener("change", applyTypeFilters);
+    });
   }
 
   function rebuildSelectedPayload() {
@@ -158,6 +211,14 @@
     selectionInputs.forEach((input) => { input.checked = false; });
     rebuildSelectedPayload();
   });
+  typesSelectAllBtn?.addEventListener("click", () => {
+    document.querySelectorAll(".preview-type-filter").forEach((input) => { input.checked = true; });
+    applyTypeFilters();
+  });
+  typesSelectNoneBtn?.addEventListener("click", () => {
+    document.querySelectorAll(".preview-type-filter").forEach((input) => { input.checked = false; });
+    applyTypeFilters();
+  });
 
   selectedImportForm?.addEventListener("submit", (event) => {
     const count = rebuildSelectedPayload();
@@ -167,7 +228,26 @@
     }
   });
 
+  renderTypeFilterControls();
+  applyTypeFilters();
   rebuildSelectedPayload();
 </script>
 {% endif %}
+
+<script>
+  const previewForm = document.getElementById("preview-form");
+  const categoryCodesInput = document.getElementById("category-codes-csv");
+  const queryTypeOptions = Array.from(document.querySelectorAll(".query-type-option"));
+
+  previewForm?.addEventListener("submit", () => {
+    const existing = categoryCodesInput?.value
+      ? categoryCodesInput.value.split(",").map((v) => v.trim()).filter(Boolean)
+      : [];
+    const selected = queryTypeOptions.filter((input) => input.checked).map((input) => input.value);
+    const merged = Array.from(new Set([...existing, ...selected]));
+    if (categoryCodesInput) {
+      categoryCodesInput.value = merged.join(",");
+    }
+  });
+</script>
 {% endblock %}

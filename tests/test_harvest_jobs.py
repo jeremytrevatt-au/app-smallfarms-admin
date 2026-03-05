@@ -21,8 +21,14 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
             "preview_results": [
                 {
                     "provider_place_id": "p-1",
-                    "name": "Test Place",
+                    "name": "Zulu Place",
                     "formatted_address": "123 Test St",
+                    "types": ["produce_store"],
+                },
+                {
+                    "provider_place_id": "p-2",
+                    "name": "Alpha Place",
+                    "formatted_address": "55 Example St",
                     "types": ["produce_store"],
                 }
             ],
@@ -60,6 +66,7 @@ def test_harvest_preview_sends_required_contract_fields(monkeypatch):
     assert "Dry Run Selected" in response.text
     assert "Query diagnostics" in response.text
     assert "microgreens farm melbourne" in response.text
+    assert response.text.find("Alpha Place") < response.text.find("Zulu Place")
 
 
 def test_harvest_preview_missing_fields_returns_validation_message():

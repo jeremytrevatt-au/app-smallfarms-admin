@@ -72,3 +72,30 @@ def test_database_failure_returns_unavailable_message(monkeypatch):
 
     assert response.status_code == 200
     assert "database_unavailable: import service unavailable." in response.text
+
+
+def test_import_sanitizes_partial_location(monkeypatch):
+    captured = {"payload": None}
+
+    async def fake_import_places(payload, dry_run):
+        assert dry_run is True
+        captured["payload"] = payload
+        return {"inserted_count": 0, "updated_count": 0, "outcomes": []}
+
+    monkeypatch.setattr(deps.platform_client, "import_places", fake_import_places)
+
+    response = client.post(
+        "/places/import/dry-run",
+        data={
+            "payload_json": (
+                '{"candidates":[{"name":"A","location":{"lat":-37.8136}},'
+                '{"name":"B","location":{"lat":-37.8,"lng":144.9}}]}'
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["payload"] is not None
+    assert "location" not in captured["payload"]["candidates"][0]
+    assert captured["payload"]["candidates"][1]["location"]["lat"] == -37.8
+    assert captured["payload"]["candidates"][1]["location"]["lng"] == 144.9

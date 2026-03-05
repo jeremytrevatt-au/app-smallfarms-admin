@@ -42,6 +42,46 @@ def _render_harvest(
     )
 
 
+def _sort_preview_results(harvest_result: dict) -> dict:
+    items = harvest_result.get("preview_results")
+    if not isinstance(items, list):
+        return harvest_result
+    sorted_items = sorted(items, key=lambda x: str(x.get("name", "")).lower())
+    updated = dict(harvest_result)
+    updated["preview_results"] = sorted_items
+    updated["preview_result_count"] = len(sorted_items)
+    return updated
+
+
+def _sanitize_import_payload(payload: dict) -> tuple[dict, int]:
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list):
+        return payload, 0
+
+    sanitized_candidates: list[dict] = []
+    partial_location_removed = 0
+    for item in candidates:
+        if not isinstance(item, dict):
+            sanitized_candidates.append(item)
+            continue
+
+        candidate = dict(item)
+        location = candidate.get("location")
+        if isinstance(location, dict):
+            has_lat = location.get("lat") is not None
+            has_lng = location.get("lng") is not None
+            if has_lat and has_lng:
+                pass
+            elif has_lat or has_lng:
+                candidate.pop("location", None)
+                partial_location_removed += 1
+        sanitized_candidates.append(candidate)
+
+    updated = dict(payload)
+    updated["candidates"] = sanitized_candidates
+    return updated, partial_location_removed
+
+
 def _import_error_message(exc: PlatformApiError) -> str:
     if exc.status_code == 422:
         return "validation_failed: partial location payload is invalid."
@@ -129,6 +169,7 @@ async def create_harvest_job(
         if form.region_hint.strip():
             payload["region_hint"] = form.region_hint.strip()
         harvest_result = await platform_client.create_harvest_job(payload)
+        harvest_result = _sort_preview_results(harvest_result)
         return _render_harvest(
             request,
             _with_timestamp("Harvest preview completed. Select candidates for import."),
@@ -177,7 +218,8 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
         )
 
     try:
-        result = await platform_client.import_places(payload, dry_run=dry_run)
+        sanitized_payload, partial_location_removed = _sanitize_import_payload(payload)
+        result = await platform_client.import_places(sanitized_payload, dry_run=dry_run)
         inserted_count = result.get("inserted_count", 0)
         updated_count = result.get("updated_count", 0)
         outcomes = result.get("outcomes", [])
@@ -186,6 +228,8 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
             f"dry_run={mode} import completed: inserted_count={inserted_count}, "
             f"updated_count={updated_count}, outcomes={outcomes}"
         )
+        if partial_location_removed:
+            message += f", partial_location_removed={partial_location_removed}"
         return _render_harvest(
             request,
             _with_timestamp(message),
