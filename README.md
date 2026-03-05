@@ -47,3 +47,20 @@ Python web admin app for moderation operations, escalation handling, policy exec
 2. Deploy:
    1. `bash scripts/deploy_cloud_run.sh <gcp-project-id> <service-name> [region]`
 
+## Main push update (2026-03-05 06:35 UTC)
+
+1. TODOs completed since last push:
+   1. Enforced import payload contract for `tenant_smallfarms`, including required candidate location and category handling.
+   2. Added listing lifecycle management integration for `PATCH /v1/admin/listings/{listing_id}` and `DELETE /v1/admin/listings/{listing_id}` with admin UI and tests.
+   3. Added nullable-safe contact rendering in moderation queue cards for admin review (`website_url`, `phone_number`, `social_urls`).
+2. Git build references:
+   1. `d3d2cbf`
+   2. `b480096`
+   3. `3e5cf8b`
+3. New understandings/learnings:
+   1. Contract-correct import now depends on complete location data in selected candidates; missing coordinates are blocked preflight before platform import.
+   2. Admin moderation visibility must include contact fields as nullable data to align with cross-team contact contract rollout.
+4. Understood next steps (remaining TODOs):
+   1. Keep validating live import behavior against platform harvest responses, especially coordinate availability in preview candidates.
+   2. Continue admin-only contract alignment updates as platform publishes additional listing profile/contact schema deltas.
+
