@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Places Preview Operations</h2>
+  <p>Run operational preview jobs using the live admin harvest contract.</p>
+  {% if message %}
+    <div class="alert {{ level }}">{{ message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <form method="post" action="/harvest/jobs" class="action-form">
+    <label>Source</label>
+    <input name="source" required placeholder="e.g. places-sync-preview">
+    <label>Note</label>
+    <textarea name="note" placeholder="Optional run context"></textarea>
+    <button type="submit" class="btn">Start Harvest Job</button>
+  </form>
+</section>
+{% endblock %}

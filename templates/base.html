@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmallFarms Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/material.css">
+</head>
+<body>
+  <header class="top-app-bar">
+    <div class="title-wrap">
+      <span class="material-icons">admin_panel_settings</span>
+      <h1>SmallFarms Admin</h1>
+    </div>
+    <nav>
+      <a class="nav-link {% if active_page == 'moderation' %}active{% endif %}" href="/moderation">Moderation</a>
+      <a class="nav-link {% if active_page == 'audit' %}active{% endif %}" href="/audit">Audit</a>
+      <a class="nav-link {% if active_page == 'billing' %}active{% endif %}" href="/billing">Billing</a>
+      <a class="nav-link {% if active_page == 'harvest' %}active{% endif %}" href="/harvest">Places Preview</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Audit Events</h2>
+  <p>Read-only operational audit view from platform contracts.</p>
+  {% if error_message %}
+    <div class="alert error">{{ error_message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Actor</th>
+        <th>Action</th>
+        <th>Entity</th>
+        <th>Tenant</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+      <tr>
+        <td>{{ event.get('timestamp', '-') }}</td>
+        <td>{{ event.get('actor', '-') }}</td>
+        <td>{{ event.get('action', '-') }}</td>
+        <td>{{ event.get('entity_id', '-') }}</td>
+        <td>{{ event.get('tenant_id', '-') }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5">No events found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
