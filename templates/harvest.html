@@ -96,6 +96,10 @@
 
   <form id="selected-import-form" method="post" class="action-form">
     <input type="hidden" id="payload_json_selected" name="payload_json">
+    <label>Import Requested By</label>
+    <input id="import-requested-by" name="import_requested_by" required placeholder="e.g. admin@smallfarms.com.au">
+    <label>Target Tenant Code</label>
+    <input id="import-target-tenant-code" name="import_target_tenant_code" required placeholder="e.g. naturalyield">
     <p id="selected-count-label">Selected candidates: 0</p>
     <div class="button-row">
       <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Selected</button>
@@ -111,6 +115,10 @@
     <form method="post" class="action-form">
       <label>Import Payload JSON</label>
       <textarea name="payload_json" rows="14" placeholder='{"candidates": []}'>{{ payload_text }}</textarea>
+      <label>Import Requested By</label>
+      <input name="import_requested_by" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Target Tenant Code</label>
+      <input name="import_target_tenant_code" required placeholder="e.g. naturalyield">
       <div class="button-row">
         <button type="submit" formaction="/places/import/dry-run" class="btn btn-warning">Dry Run Import</button>
         <button type="submit" formaction="/places/import/commit" class="btn btn-success">Commit Import</button>
@@ -163,6 +171,8 @@
   const selectedCountLabel = document.getElementById("selected-count-label");
   const selectedPayloadInput = document.getElementById("payload_json_selected");
   const selectedImportForm = document.getElementById("selected-import-form");
+  const importRequestedByInput = document.getElementById("import-requested-by");
+  const importTargetTenantCodeInput = document.getElementById("import-target-tenant-code");
   const selectAllBtn = document.getElementById("select-all-preview");
   const selectNoneBtn = document.getElementById("select-none-preview");
   const previewTypeFilters = document.getElementById("preview-type-filters");
@@ -251,7 +261,15 @@
       .filter((input) => input.checked)
       .some((input) => existsInDatabaseByIndex(parseInt(input.value, 10)));
     existingSelectionWarning.style.display = hasExistingSelected ? "" : "none";
-    selectedPayloadInput.value = JSON.stringify({ candidates: selected }, null, 2);
+    selectedPayloadInput.value = JSON.stringify(
+      {
+        requested_by: (importRequestedByInput?.value || "").trim(),
+        target_tenant_code: (importTargetTenantCodeInput?.value || "").trim(),
+        candidates: selected,
+      },
+      null,
+      2
+    );
     return selected.length;
   }
 
@@ -295,6 +313,10 @@
     if (count === 0) {
       event.preventDefault();
       alert("Select at least one candidate before import.");
+    }
+    if (!importRequestedByInput?.value.trim() || !importTargetTenantCodeInput?.value.trim()) {
+      event.preventDefault();
+      alert("Import Requested By and Target Tenant Code are required.");
     }
   });
 

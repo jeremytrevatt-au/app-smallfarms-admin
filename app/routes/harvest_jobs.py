@@ -53,13 +53,13 @@ def _sort_preview_results(harvest_result: dict) -> dict:
     return updated
 
 
-def _sanitize_import_payload(payload: dict) -> tuple[dict, int]:
+def _sanitize_import_payload(payload: dict) -> tuple[dict, list[str]]:
     candidates = payload.get("candidates")
     if not isinstance(candidates, list):
-        return payload, 0
+        return payload, []
 
     sanitized_candidates: list[dict] = []
-    partial_location_removed = 0
+    partial_location_removed_ids: list[str] = []
     for item in candidates:
         if not isinstance(item, dict):
             sanitized_candidates.append(item)
@@ -74,12 +74,58 @@ def _sanitize_import_payload(payload: dict) -> tuple[dict, int]:
                 pass
             elif has_lat or has_lng:
                 candidate.pop("location", None)
-                partial_location_removed += 1
+                provider_id = str(candidate.get("provider_place_id", "unknown"))
+                partial_location_removed_ids.append(provider_id)
         sanitized_candidates.append(candidate)
 
     updated = dict(payload)
     updated["candidates"] = sanitized_candidates
-    return updated, partial_location_removed
+    return updated, partial_location_removed_ids
+
+
+def _shape_import_payload(payload: dict) -> dict:
+    shaped = dict(payload)
+    candidates = shaped.get("candidates")
+    if not isinstance(candidates, list):
+        return shaped
+
+    mapped_candidates: list[dict] = []
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        candidate = dict(item)
+        if not candidate.get("display_name"):
+            candidate["display_name"] = candidate.get("name", "")
+        candidate.pop("exists_in_database", None)
+        candidate.pop("existing_listing_id", None)
+        mapped_candidates.append(candidate)
+
+    shaped["candidates"] = mapped_candidates
+    return shaped
+
+
+def _validate_import_payload(payload: dict) -> list[str]:
+    errors: list[str] = []
+    if not str(payload.get("requested_by", "")).strip():
+        errors.append("missing top-level field: requested_by")
+    if not str(payload.get("target_tenant_code", "")).strip():
+        errors.append("missing top-level field: target_tenant_code")
+
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        errors.append("missing candidates[]")
+        return errors
+
+    for idx, item in enumerate(candidates):
+        if not isinstance(item, dict):
+            errors.append(f"candidate[{idx}] is not an object")
+            continue
+        provider_id = item.get("provider_place_id", f"index-{idx}")
+        if not str(item.get("display_name", "")).strip():
+            errors.append(f"candidate {provider_id}: missing display_name")
+        if not str(item.get("provider_place_id", "")).strip():
+            errors.append(f"candidate {provider_id}: missing provider_place_id")
+    return errors
 
 
 def _import_error_message(exc: PlatformApiError) -> str:
@@ -181,16 +227,44 @@ async def create_harvest_job(
 
 
 @router.post("/places/import/dry-run", include_in_schema=False)
-async def import_places_dry_run(request: Request, payload_json: str = Form("")):
-    return await _run_places_import(request, payload_json, dry_run=True)
+async def import_places_dry_run(
+    request: Request,
+    payload_json: str = Form(""),
+    import_requested_by: str = Form(""),
+    import_target_tenant_code: str = Form(""),
+):
+    return await _run_places_import(
+        request,
+        payload_json,
+        dry_run=True,
+        import_requested_by=import_requested_by,
+        import_target_tenant_code=import_target_tenant_code,
+    )
 
 
 @router.post("/places/import/commit", include_in_schema=False)
-async def import_places_commit(request: Request, payload_json: str = Form("")):
-    return await _run_places_import(request, payload_json, dry_run=False)
+async def import_places_commit(
+    request: Request,
+    payload_json: str = Form(""),
+    import_requested_by: str = Form(""),
+    import_target_tenant_code: str = Form(""),
+):
+    return await _run_places_import(
+        request,
+        payload_json,
+        dry_run=False,
+        import_requested_by=import_requested_by,
+        import_target_tenant_code=import_target_tenant_code,
+    )
 
 
-async def _run_places_import(request: Request, payload_json: str, dry_run: bool):
+async def _run_places_import(
+    request: Request,
+    payload_json: str,
+    dry_run: bool,
+    import_requested_by: str,
+    import_target_tenant_code: str,
+):
     if not payload_json.strip():
         return _render_harvest(
             request,
@@ -217,8 +291,23 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
             payload_text=payload_json,
         )
 
+    if import_requested_by.strip() and "requested_by" not in payload:
+        payload["requested_by"] = import_requested_by.strip()
+    if import_target_tenant_code.strip() and "target_tenant_code" not in payload:
+        payload["target_tenant_code"] = import_target_tenant_code.strip()
+
+    shaped_payload = _shape_import_payload(payload)
+    validation_errors = _validate_import_payload(shaped_payload)
+    if validation_errors:
+        return _render_harvest(
+            request,
+            _with_timestamp("Import preflight failed: " + "; ".join(validation_errors)),
+            "error",
+            payload_text=payload_json,
+        )
+
     try:
-        sanitized_payload, partial_location_removed = _sanitize_import_payload(payload)
+        sanitized_payload, partial_location_removed_ids = _sanitize_import_payload(shaped_payload)
         result = await platform_client.import_places(sanitized_payload, dry_run=dry_run)
         inserted_count = result.get("inserted_count", 0)
         updated_count = result.get("updated_count", 0)
@@ -228,8 +317,11 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
             f"dry_run={mode} import completed: inserted_count={inserted_count}, "
             f"updated_count={updated_count}, outcomes={outcomes}"
         )
-        if partial_location_removed:
-            message += f", partial_location_removed={partial_location_removed}"
+        if partial_location_removed_ids:
+            message += (
+                f", partial_location_removed={len(partial_location_removed_ids)} "
+                f"provider_place_ids={partial_location_removed_ids}"
+            )
         return _render_harvest(
             request,
             _with_timestamp(message),

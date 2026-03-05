@@ -17,7 +17,11 @@ def test_dry_run_import_success(monkeypatch):
 
     response = client.post(
         "/places/import/dry-run",
-        data={"payload_json": '{"candidates": [{"external_id": "abc"}]}'},
+        data={
+            "payload_json": '{"candidates": [{"provider_place_id":"abc","display_name":"ABC"}]}',
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
+        },
     )
 
     assert response.status_code == 200
@@ -34,7 +38,11 @@ def test_commit_import_updated_existing(monkeypatch):
 
     response = client.post(
         "/places/import/commit",
-        data={"payload_json": '{"candidates": [{"external_id": "abc"}]}'},
+        data={
+            "payload_json": '{"candidates": [{"provider_place_id":"abc","display_name":"ABC"}]}',
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
+        },
     )
 
     assert response.status_code == 200
@@ -51,7 +59,11 @@ def test_partial_location_returns_validation_failed(monkeypatch):
 
     response = client.post(
         "/places/import/dry-run",
-        data={"payload_json": '{"candidates": [{"location": {"lat": -33.8}}]}'},
+        data={
+            "payload_json": '{"candidates": [{"provider_place_id":"abc","display_name":"ABC","location": {"lat": -33.8}}]}',
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
+        },
     )
 
     assert response.status_code == 200
@@ -67,7 +79,11 @@ def test_database_failure_returns_unavailable_message(monkeypatch):
 
     response = client.post(
         "/places/import/commit",
-        data={"payload_json": '{"candidates": [{"external_id": "abc"}]}'},
+        data={
+            "payload_json": '{"candidates": [{"provider_place_id":"abc","display_name":"ABC"}]}',
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
+        },
     )
 
     assert response.status_code == 200
@@ -88,9 +104,11 @@ def test_import_sanitizes_partial_location(monkeypatch):
         "/places/import/dry-run",
         data={
             "payload_json": (
-                '{"candidates":[{"name":"A","location":{"lat":-37.8136}},'
-                '{"name":"B","location":{"lat":-37.8,"lng":144.9}}]}'
-            )
+                '{"candidates":[{"provider_place_id":"p-1","name":"A","location":{"lat":-37.8136}},'
+                '{"provider_place_id":"p-2","name":"B","location":{"lat":-37.8,"lng":144.9}}]}'
+            ),
+            "import_requested_by": "admin@smallfarms.com.au",
+            "import_target_tenant_code": "naturalyield",
         },
     )
 
@@ -99,3 +117,18 @@ def test_import_sanitizes_partial_location(monkeypatch):
     assert "location" not in captured["payload"]["candidates"][0]
     assert captured["payload"]["candidates"][1]["location"]["lat"] == -37.8
     assert captured["payload"]["candidates"][1]["location"]["lng"] == 144.9
+
+
+def test_import_preflight_reports_offending_provider_ids():
+    response = client.post(
+        "/places/import/commit",
+        data={
+            "payload_json": '{"candidates":[{"provider_place_id":"bad-1","display_name":""}]}',
+            "import_requested_by": "",
+            "import_target_tenant_code": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Import preflight failed:" in response.text
+    assert "candidate bad-1: missing display_name" in response.text
