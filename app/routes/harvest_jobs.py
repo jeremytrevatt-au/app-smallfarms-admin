@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Form, Request
 
@@ -9,6 +10,14 @@ from pydantic import ValidationError
 
 
 router = APIRouter()
+
+
+def _utc_now_label() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _with_timestamp(message: str) -> str:
+    return f"{message} (at {_utc_now_label()})"
 
 
 def _render_harvest(
@@ -57,12 +66,12 @@ async def create_harvest_job(request: Request, source: str = Form(""), note: str
         harvest_result = await platform_client.create_harvest_job(form.source, form.note)
         return _render_harvest(
             request,
-            "Harvest preview completed. Select candidates for import.",
+            _with_timestamp("Harvest preview completed. Select candidates for import."),
             "success",
             harvest_result=harvest_result,
         )
     except PlatformApiError as exc:
-        return _render_harvest(request, f"Harvest job failed: {exc.message}", "error")
+        return _render_harvest(request, _with_timestamp(f"Harvest job failed: {exc.message}"), "error")
 
 
 @router.post("/places/import/dry-run", include_in_schema=False)
@@ -114,7 +123,7 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
         )
         return _render_harvest(
             request,
-            message,
+            _with_timestamp(message),
             "success",
             payload_text=payload_json,
             import_result=result,
@@ -122,7 +131,7 @@ async def _run_places_import(request: Request, payload_json: str, dry_run: bool)
     except PlatformApiError as exc:
         return _render_harvest(
             request,
-            _import_error_message(exc),
+            _with_timestamp(_import_error_message(exc)),
             "error",
             payload_text=payload_json,
         )
