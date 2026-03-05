@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
+import time
 import httpx
 
 from app.config import settings
+from app.services.api_log_store import api_log_store
 
 
 class PlatformApiError(Exception):
@@ -30,6 +33,8 @@ class PlatformApiClient:
         self, method: str, path: str, json_body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
+        started_at = datetime.now(timezone.utc)
+        start_perf = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.request(
@@ -39,22 +44,90 @@ class PlatformApiClient:
                     json=json_body,
                 )
         except httpx.RequestError as exc:
+            latency_ms = int((time.perf_counter() - start_perf) * 1000)
+            self._record_post(
+                method=method,
+                path=path,
+                started_at=started_at,
+                latency_ms=latency_ms,
+                request_body=json_body,
+                status_code=503,
+                response_body={"error": f"Platform API unreachable: {exc}"},
+            )
             raise PlatformApiError(503, f"Platform API unreachable: {exc}") from exc
 
         if response.status_code >= 400:
             message = response.text
             error_code = ""
+            response_body: Any = response.text
             try:
                 body = response.json()
                 message = body.get("message") or body.get("error") or message
                 error_code = body.get("code") or body.get("error_code") or ""
+                response_body = body
             except ValueError:
                 pass
+            latency_ms = int((time.perf_counter() - start_perf) * 1000)
+            self._record_post(
+                method=method,
+                path=path,
+                started_at=started_at,
+                latency_ms=latency_ms,
+                request_body=json_body,
+                status_code=response.status_code,
+                response_body=response_body,
+            )
             raise PlatformApiError(response.status_code, message, error_code)
 
+        latency_ms = int((time.perf_counter() - start_perf) * 1000)
+        response_json = {}
         if not response.content:
-            return {}
-        return response.json()
+            self._record_post(
+                method=method,
+                path=path,
+                started_at=started_at,
+                latency_ms=latency_ms,
+                request_body=json_body,
+                status_code=response.status_code,
+                response_body=response_json,
+            )
+            return response_json
+        response_json = response.json()
+        self._record_post(
+            method=method,
+            path=path,
+            started_at=started_at,
+            latency_ms=latency_ms,
+            request_body=json_body,
+            status_code=response.status_code,
+            response_body=response_json,
+        )
+        return response_json
+
+    def _record_post(
+        self,
+        method: str,
+        path: str,
+        started_at: datetime,
+        latency_ms: int,
+        request_body: dict[str, Any] | None,
+        status_code: int,
+        response_body: Any,
+    ) -> None:
+        if method.upper() != "POST":
+            return
+        api_log_store.add(
+            {
+                "started_at_utc": started_at.isoformat(),
+                "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                "method": method.upper(),
+                "path": path,
+                "request_body": request_body or {},
+                "status_code": status_code,
+                "response_body": response_body,
+                "latency_ms": latency_ms,
+            }
+        )
 
     async def list_submissions(self) -> dict[str, Any]:
         return await self._request("GET", "/v1/admin/moderation/submissions")

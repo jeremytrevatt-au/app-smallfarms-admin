@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.routes import (
+    api_logs,
     audit_events,
     billing_subscriptions,
     harvest_jobs,
@@ -31,3 +32,4 @@ app.include_router(moderation_resolve_escalation.router)
 app.include_router(audit_events.router)
 app.include_router(billing_subscriptions.router)
 app.include_router(harvest_jobs.router)
+app.include_router(api_logs.router)

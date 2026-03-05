@@ -31,3 +31,9 @@ def test_harvest_page_loads():
     response = client.get("/harvest")
     assert response.status_code == 200
     assert "Workflow: run harvest preview, dry-run import selected candidates, then commit import." in response.text
+
+
+def test_api_logs_page_loads():
+    response = client.get("/api-logs")
+    assert response.status_code == 200
+    assert "API POST Logs" in response.text

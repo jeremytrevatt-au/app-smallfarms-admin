@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>API POST Logs</h2>
+  <p>Inspectable request and response logs with UTC timestamps for outbound platform POST calls.</p>
+</section>
+
+<section class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Started (UTC)</th>
+        <th>Method</th>
+        <th>Path</th>
+        <th>Status</th>
+        <th>Latency (ms)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ item.get('started_at_utc', '-') }}</td>
+        <td>{{ item.get('method', '-') }}</td>
+        <td>{{ item.get('path', '-') }}</td>
+        <td>{{ item.get('status_code', '-') }}</td>
+        <td>{{ item.get('latency_ms', '-') }}</td>
+      </tr>
+      <tr>
+        <td colspan="5">
+          <details>
+            <summary>Request/Response</summary>
+            <pre>{{ item | tojson(indent=2) }}</pre>
+          </details>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5">No API POST logs yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
