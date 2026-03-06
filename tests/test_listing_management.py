@@ -19,15 +19,12 @@ def test_listing_management_page_loads():
 def test_patch_listing_success(monkeypatch):
     captured = {"payload": None}
 
-    async def fake_patch_admin_listing(
-        listing_id, requested_by, reason_code, display_name, primary_category_code, status_code
-    ):
+    async def fake_patch_admin_listing(listing_id, requested_by, reason_code, display_name, status_code):
         captured["payload"] = {
             "listing_id": listing_id,
             "requested_by": requested_by,
             "reason_code": reason_code,
             "display_name": display_name,
-            "primary_category_code": primary_category_code,
             "status_code": status_code,
         }
         return {"listing_id": listing_id, "status_code": status_code}
@@ -41,7 +38,6 @@ def test_patch_listing_success(monkeypatch):
             "requested_by": "admin@smallfarms.com.au",
             "reason_code": "ADMIN_LISTING_UPDATE",
             "display_name": "Example Farm",
-            "primary_category_code": "",
             "status_code": "active",
         },
     )
@@ -61,16 +57,44 @@ def test_patch_listing_requires_mutable_field():
             "requested_by": "admin@smallfarms.com.au",
             "reason_code": "ADMIN_LISTING_UPDATE",
             "display_name": "",
-            "primary_category_code": "",
             "status_code": "",
         },
     )
 
     assert response.status_code == 200
-    assert (
-        "At least one mutable field is required: display_name, primary_category_code, or status_code."
-        in response.text
+    assert "At least one mutable field is required: display_name or status_code." in response.text
+
+
+def test_patch_listing_does_not_send_primary_category_code(monkeypatch):
+    captured = {"payload": None}
+
+    async def fake_patch_admin_listing(listing_id, requested_by, reason_code, display_name, status_code):
+        captured["payload"] = {
+            "listing_id": listing_id,
+            "requested_by": requested_by,
+            "reason_code": reason_code,
+            "display_name": display_name,
+            "status_code": status_code,
+        }
+        return {"listing_id": listing_id, "status_code": status_code}
+
+    monkeypatch.setattr(deps.platform_client, "patch_admin_listing", fake_patch_admin_listing)
+
+    response = client.post(
+        "/listings/manage/update",
+        data={
+            "listing_id": "listing-456",
+            "requested_by": "admin@smallfarms.com.au",
+            "reason_code": "ADMIN_LISTING_UPDATE",
+            "display_name": "Only Name",
+            "primary_category_code": "should-be-ignored",
+            "status_code": "",
+        },
     )
+
+    assert response.status_code == 200
+    assert captured["payload"] is not None
+    assert "primary_category_code" not in captured["payload"]
 
 
 def test_delete_listing_success(monkeypatch):

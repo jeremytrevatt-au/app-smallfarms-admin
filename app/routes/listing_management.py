@@ -15,7 +15,6 @@ def _render_listing_management(
     update_requested_by: str = "",
     update_reason_code: str = "",
     update_display_name: str = "",
-    update_primary_category_code: str = "",
     update_status_code: str = "",
     delete_listing_id: str = "",
     delete_requested_by: str = "",
@@ -33,7 +32,6 @@ def _render_listing_management(
             "update_requested_by": update_requested_by,
             "update_reason_code": update_reason_code,
             "update_display_name": update_display_name,
-            "update_primary_category_code": update_primary_category_code,
             "update_status_code": update_status_code,
             "delete_listing_id": delete_listing_id,
             "delete_requested_by": delete_requested_by,
@@ -48,7 +46,10 @@ def _listing_lifecycle_error_message(exc: PlatformApiError, action: str) -> str:
     if exc.status_code == 404:
         return "listing_not_found: listing_id does not exist."
     if exc.status_code == 422:
-        return "validation_failed: check requested_by, reason_code, and mutable fields."
+        return (
+            "validation_failed: check requested_by/reason_code, and patch only display_name/status_code. "
+            "Use listing tag assignments for taxonomy updates."
+        )
     if exc.status_code == 503:
         return "database_unavailable: listing lifecycle service unavailable."
     return f"{prefix}: {exc.message}"
@@ -66,7 +67,6 @@ async def patch_listing(
     requested_by: str = Form(""),
     reason_code: str = Form(""),
     display_name: str = Form(""),
-    primary_category_code: str = Form(""),
     status_code: str = Form(""),
 ):
     if not listing_id.strip() or not requested_by.strip() or not reason_code.strip():
@@ -78,23 +78,17 @@ async def patch_listing(
             update_requested_by=requested_by,
             update_reason_code=reason_code,
             update_display_name=display_name,
-            update_primary_category_code=primary_category_code,
             update_status_code=status_code,
         )
-    if (
-        not display_name.strip()
-        and not primary_category_code.strip()
-        and not status_code.strip()
-    ):
+    if not display_name.strip() and not status_code.strip():
         return _render_listing_management(
             request,
-            "At least one mutable field is required: display_name, primary_category_code, or status_code.",
+            "At least one mutable field is required: display_name or status_code.",
             "error",
             update_listing_id=listing_id,
             update_requested_by=requested_by,
             update_reason_code=reason_code,
             update_display_name=display_name,
-            update_primary_category_code=primary_category_code,
             update_status_code=status_code,
         )
     try:
@@ -103,7 +97,6 @@ async def patch_listing(
             requested_by=requested_by.strip(),
             reason_code=reason_code.strip(),
             display_name=display_name,
-            primary_category_code=primary_category_code,
             status_code=status_code,
         )
         return _render_listing_management(
@@ -114,7 +107,6 @@ async def patch_listing(
             update_requested_by=requested_by,
             update_reason_code=reason_code,
             update_display_name=display_name,
-            update_primary_category_code=primary_category_code,
             update_status_code=status_code,
             result=result,
         )
@@ -127,7 +119,6 @@ async def patch_listing(
             update_requested_by=requested_by,
             update_reason_code=reason_code,
             update_display_name=display_name,
-            update_primary_category_code=primary_category_code,
             update_status_code=status_code,
         )
 

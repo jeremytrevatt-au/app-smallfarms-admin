@@ -10,6 +10,7 @@
 
 <section class="card">
   <h3>Patch Listing Metadata</h3>
+  <p>Tags are canonical taxonomy. Category/Farm Type are derived from tag assignments and not editable here.</p>
   <form method="post" action="/listings/manage/update" class="action-form">
     <label>Listing ID</label>
     <input name="listing_id" value="{{ update_listing_id }}" required placeholder="listing-123">
@@ -19,12 +20,11 @@
     <input name="reason_code" value="{{ update_reason_code }}" required placeholder="ADMIN_LISTING_UPDATE">
     <label>Display Name (optional mutable field)</label>
     <input name="display_name" value="{{ update_display_name }}" placeholder="Example Farm">
-    <label>Primary Category Code (optional mutable field)</label>
-    <input name="primary_category_code" value="{{ update_primary_category_code }}" placeholder="microgreens">
     <label>Status Code (optional mutable field)</label>
     <input name="status_code" value="{{ update_status_code }}" placeholder="active">
     <button type="submit" class="btn">Patch Listing</button>
   </form>
+  <p>To update taxonomy, use the Listing Tags page and tag assignment endpoint.</p>
 </section>
 
 <section class="card">
