@@ -64,3 +64,18 @@ Python web admin app for moderation operations, escalation handling, policy exec
    1. Keep validating live import behavior against platform harvest responses, especially coordinate availability in preview candidates.
    2. Continue admin-only contract alignment updates as platform publishes additional listing profile/contact schema deltas.
 
+## Main push update (2026-03-06 09:17 UTC)
+
+1. TODOs completed since last push:
+   1. Aligned admin listing patch flow with tags-first taxonomy rules.
+   2. Removed direct `primary_category_code` patching from admin listing management update path.
+   3. Restricted listing patch mutable fields to `display_name` and `status_code`, and updated UI guidance to use tag assignments for taxonomy updates.
+2. Git build references:
+   1. `66eb3f5`
+3. New understandings/learnings:
+   1. Tags are the canonical taxonomy source, and category/farm-type must be treated as backend-derived compatibility projections.
+   2. Admin listing patch endpoint should remain lifecycle-focused (display/status), with taxonomy managed through `POST /v1/admin/listings/{listing_id}/tag-assignments`.
+4. Understood next steps (remaining TODOs):
+   1. Continue validating admin UX and error messages against future backend taxonomy rule changes.
+   2. Keep moderation/operator guidance aligned to tags-first behavior across admin workflows.
+
