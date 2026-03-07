@@ -79,3 +79,18 @@ Python web admin app for moderation operations, escalation handling, policy exec
    1. Continue validating admin UX and error messages against future backend taxonomy rule changes.
    2. Keep moderation/operator guidance aligned to tags-first behavior across admin workflows.
 
+## Main push update (2026-03-07 11:01 UTC)
+
+1. TODOs completed since last push:
+   1. Reviewed endpoint contract deltas and implemented admin-applicable public read-model alignment only.
+   2. Normalized moderation snapshot rendering for explicit `is_premium`/`is_claimed`, contact defaults, tags list shape, and location object with `formatted_address`.
+   3. Added moderation UI coverage tests for default-safe rendering, nested listing parity behavior, and partial tag normalization.
+2. Git build references:
+   1. `4c081fe`
+3. New understandings/learnings:
+   1. Admin moderation tooling should treat public list/detail shape guarantees as an operator visibility contract, while keeping platform payload as source-of-truth.
+   2. Website caching/ETag behavior is not an admin runtime concern; admin applicability is read-model visibility and parity validation.
+4. Understood next steps (remaining TODOs):
+   1. Continue validating moderation views against future public response guarantee updates from platform.
+   2. Keep admin docs synchronized when cross-team contracts add new read-model fields that moderators must review.
+
