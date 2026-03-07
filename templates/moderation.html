@@ -22,7 +22,21 @@
     </div>
   </div>
 
-  {% set contact = item.get('admin_contact', {}) %}
+  {% set public_model = item.get('admin_public_read_model', {}) %}
+  <h4>Public Read Model Snapshot</h4>
+  <p>Display Name: {{ public_model.get('display_name') or '-' }}</p>
+  <p>is_premium: {% if public_model.get('is_premium') %}true{% else %}false{% endif %}</p>
+  <p>is_claimed: {% if public_model.get('is_claimed') %}true{% else %}false{% endif %}</p>
+  <p>Primary Category: {{ public_model.get('primary_category_code') or '-' }}</p>
+  <p>Farm Type (compat): {{ public_model.get('farm_type_code') or '-' }}</p>
+  <p>Summary: {{ public_model.get('summary') or '-' }}</p>
+  {% set location = public_model.get('location', {}) %}
+  <p>Location Address: {{ location.get('formatted_address') or '-' }}</p>
+  <p>Location Lat/Lng: {{ location.get('lat') if location.get('lat') is not none else '-' }} / {{ location.get('lng') if location.get('lng') is not none else '-' }}</p>
+  {% set tags = public_model.get('tags', []) %}
+  <p>Tags: {% if tags %}{{ tags | tojson }}{% else %}[]{% endif %}</p>
+
+  {% set contact = public_model.get('contact', {}) %}
   <h4>Contact Preview</h4>
   <p>Website: {{ contact.get('website_url') or '-' }}</p>
   <p>Phone: {{ contact.get('phone_number') or '-' }}</p>

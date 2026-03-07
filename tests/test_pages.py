@@ -17,6 +17,29 @@ def test_moderation_page_loads(monkeypatch):
     assert "Moderation Queue" in response.text
 
 
+def test_moderation_page_renders_public_read_model_defaults(monkeypatch):
+    async def fake_list_submissions():
+        return {
+            "items": [
+                {
+                    "id": "sub-defaults",
+                    "status": "pending",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert "Public Read Model Snapshot" in response.text
+    assert "is_premium: false" in response.text
+    assert "is_claimed: false" in response.text
+    assert "Tags: []" in response.text
+    assert "Location Address: -" in response.text
+    assert "Website: -" in response.text
+    assert "Phone: -" in response.text
+
+
 def test_moderation_page_renders_contact_fields(monkeypatch):
     async def fake_list_submissions():
         return {
@@ -63,6 +86,68 @@ def test_moderation_page_renders_nullable_contact_fields(monkeypatch):
     assert "Contact Preview" in response.text
     assert "Website: -" in response.text
     assert "Phone: -" in response.text
+
+
+def test_moderation_page_renders_public_model_from_nested_listing(monkeypatch):
+    async def fake_list_submissions():
+        return {
+            "items": [
+                {
+                    "id": "sub-nested",
+                    "status": "pending",
+                    "listing": {
+                        "display_name": "Example Farm",
+                        "is_premium": True,
+                        "is_claimed": True,
+                        "primary_category_code": "microgreens",
+                        "farm_type_code": "microgreens",
+                        "summary": "Premium microgreen supplier",
+                        "location": {
+                            "lat": -27.4705,
+                            "lng": 153.0260,
+                            "formatted_address": "Brisbane QLD, Australia",
+                            "precision_flag": "exact",
+                            "viewport_hint": {},
+                        },
+                        "tags": [{"code": "microgreens", "label": "Microgreens"}],
+                        "contact": {
+                            "website_url": "https://examplefarm.com.au",
+                            "phone_number": "+61 3 9000 0000",
+                            "social_urls": {},
+                        },
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert "Example Farm" in response.text
+    assert "is_premium: true" in response.text
+    assert "is_claimed: true" in response.text
+    assert "microgreens" in response.text
+    assert "Brisbane QLD, Australia" in response.text
+
+
+def test_moderation_page_normalizes_partial_tag_entries(monkeypatch):
+    async def fake_list_submissions():
+        return {
+            "items": [
+                {
+                    "id": "sub-tags",
+                    "status": "pending",
+                    "listing": {
+                        "tags": [{"code": "flowers"}, "invalid-item"],
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation")
+    assert response.status_code == 200
+    assert '{"code": "flowers", "label": ""}' in response.text
 
 
 def test_billing_page_read_only(monkeypatch):
