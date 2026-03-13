@@ -135,3 +135,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Client integration expectations:
    1. Custom Editor should display and reuse normalized `pretty_name` from patch responses.
    2. Website routing should prefer `/farm/{pretty_name}` when available and continue UUID routes when `pretty_name` is null.
+
+## Main push update (2026-03-13 10:24 UTC)
+
+1. TODOs completed since last push:
+   1. Added admin moderation public-read snapshot support for nullable `pretty_name` and `canonical_path`.
+   2. Added admin-facing public pretty-name resolve workflow using `GET /v1/public/listings/by-pretty-name/{pretty_name}`.
+   3. Kept admin listing write behavior contract-safe by documenting that `pretty_name` remains premium/member-flow managed.
+   4. Added regression coverage for friendly URL fields and `listing_not_found` resolve behavior.
+2. Git build references:
+   1. `1815702`
+3. New understandings/learnings:
+   1. Admin applicability for friendly URLs is read-model parity and operator lookup tooling, not admin ownership of `pretty_name` mutation.
+   2. A dedicated admin resolve screen reduces contract verification friction while keeping UUID routes and existing moderation workflows unchanged.
+4. Understood next steps (remaining TODOs):
+   1. Validate moderation and resolve UI against any future public listing payload additions tied to friendly routing.
+   2. Keep admin error messaging aligned if platform error-code semantics for pretty-name resolution evolve.
