@@ -25,6 +25,8 @@
   {% set public_model = item.get('admin_public_read_model', {}) %}
   <h4>Public Read Model Snapshot</h4>
   <p>Display Name: {{ public_model.get('display_name') or '-' }}</p>
+  <p>Pretty Name: {{ public_model.get('pretty_name') or '-' }}</p>
+  <p>Canonical Path: {{ public_model.get('canonical_path') or '-' }}</p>
   <p>is_premium: {% if public_model.get('is_premium') %}true{% else %}false{% endif %}</p>
   <p>is_claimed: {% if public_model.get('is_claimed') %}true{% else %}false{% endif %}</p>
   <p>Primary Category: {{ public_model.get('primary_category_code') or '-' }}</p>

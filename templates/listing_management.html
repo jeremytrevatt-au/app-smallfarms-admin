@@ -11,6 +11,7 @@
 <section class="card">
   <h3>Patch Listing Metadata</h3>
   <p>Tags are canonical taxonomy. Category/Farm Type are derived from tag assignments and not editable here.</p>
+  <p><code>pretty_name</code> is premium/member-flow managed and is not writable through admin listing patch routes.</p>
   <form method="post" action="/listings/manage/update" class="action-form">
     <label>Listing ID</label>
     <input name="listing_id" value="{{ update_listing_id }}" required placeholder="listing-123">

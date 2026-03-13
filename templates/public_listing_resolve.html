@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Public Listing Resolve</h2>
+  <p>Resolve friendly route values through <code>GET /v1/public/listings/by-pretty-name/{pretty_name}</code>.</p>
+  <p>UUID-based listing routes remain valid and unchanged.</p>
+  {% if message %}
+    <div class="alert {{ level }}">{{ message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>Lookup by Pretty Name</h3>
+  <form method="post" action="/listings/public-resolve" class="action-form">
+    <label>Pretty Name</label>
+    <input name="pretty_name" value="{{ pretty_name }}" required placeholder="example-farm">
+    <button type="submit" class="btn">Resolve Listing</button>
+  </form>
+</section>
+
+{% if result %}
+<section class="card">
+  <h3>Resolved Listing</h3>
+  <pre>{{ result | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+{% endblock %}

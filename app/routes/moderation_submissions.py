@@ -65,6 +65,8 @@ def _normalized_public_read_model(item: dict) -> dict:
     }
     return {
         "display_name": str(source.get("display_name") or ""),
+        "pretty_name": str(source.get("pretty_name") or ""),
+        "canonical_path": str(source.get("canonical_path") or ""),
         "is_premium": bool(source.get("is_premium", False)),
         "is_claimed": bool(source.get("is_claimed", False)),
         "primary_category_code": str(source.get("primary_category_code") or ""),

@@ -94,3 +94,44 @@ Python web admin app for moderation operations, escalation handling, policy exec
    1. Continue validating moderation views against future public response guarantee updates from platform.
    2. Keep admin docs synchronized when cross-team contracts add new read-model fields that moderators must review.
 
+## Contract update (friendly URLs and pretty_name)
+
+1. Backend-live summary:
+   1. Friendly URL support is live via premium-managed `pretty_name`, public payload additions, and public resolve endpoint support.
+   2. Existing UUID-based listing routes remain valid and unchanged.
+2. Admin team endpoint contract updates:
+   1. Public listing read payloads now include nullable `pretty_name` and `canonical_path` on:
+      1. `GET /v1/public/listings`
+      2. `GET /v1/public/listings/{listing_id}`
+   2. New public resolve endpoint for friendly route lookup:
+      1. `GET /v1/public/listings/by-pretty-name/{pretty_name}`
+      2. Returns canonical public listing read model including `listing_id`, `pretty_name`, and `canonical_path`.
+   3. Unknown `pretty_name` behavior:
+      1. HTTP `404`
+      2. Error code `listing_not_found`
+   4. Admin write endpoint status:
+      1. No admin-specific `pretty_name` write route in this release.
+      2. Admin should treat `pretty_name` ownership as premium/member-flow managed.
+3. Custom-editor team endpoint contract updates:
+   1. Member write contract change:
+      1. `PATCH /v1/member/listings/{listing_id}/draft` now supports optional `pretty_name` with existing `profile_patch`, `media_refs`, and `client_revision`.
+   2. Backend normalization and validation for incoming `pretty_name`:
+      1. Lowercase enforced.
+      2. Allowed characters: `[a-z0-9-]`.
+      3. Leading and trailing hyphens trimmed.
+      4. Repeated hyphens collapsed.
+      5. Reserved words blocked: `admin`, `api`, `directory`, `farm`, `login`, `signup`, `stories`.
+   3. Premium entitlement enforcement:
+      1. Non-premium attempts to set `pretty_name` return HTTP `403` with `pretty_name_premium_required`.
+   4. Conflict enforcement:
+      1. Duplicate normalized value returns HTTP `409` with `pretty_name_conflict`.
+   5. Validation error codes expected by client:
+      1. `pretty_name_invalid_format`
+      2. `pretty_name_reserved_word`
+      3. `pretty_name_conflict`
+      4. `pretty_name_premium_required`
+   6. Response behavior:
+      1. Member draft patch response includes normalized saved `pretty_name` for canonical client display.
+4. Client integration expectations:
+   1. Custom Editor should display and reuse normalized `pretty_name` from patch responses.
+   2. Website routing should prefer `/farm/{pretty_name}` when available and continue UUID routes when `pretty_name` is null.

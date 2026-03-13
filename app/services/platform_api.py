@@ -180,6 +180,12 @@ class PlatformApiClient:
     async def list_billing_subscriptions(self) -> dict[str, Any]:
         return await self._request("GET", "/v1/admin/billing/subscriptions")
 
+    async def get_public_listing_by_pretty_name(self, pretty_name: str) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/v1/public/listings/by-pretty-name/{pretty_name}",
+        )
+
     async def create_harvest_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._request(
             "POST",

@@ -17,6 +17,7 @@ from app.routes import (
     moderation_request_changes,
     moderation_resolve_escalation,
     moderation_submissions,
+    public_listing_resolve,
     tags_governance,
 )
 
@@ -38,4 +39,5 @@ app.include_router(harvest_jobs.router)
 app.include_router(tags_governance.router)
 app.include_router(listing_tag_assignments.router)
 app.include_router(listing_management.router)
+app.include_router(public_listing_resolve.router)
 app.include_router(api_logs.router)
