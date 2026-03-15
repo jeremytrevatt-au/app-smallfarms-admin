@@ -151,3 +151,15 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Validate moderation and resolve UI against any future public listing payload additions tied to friendly routing.
    2. Keep admin error messaging aligned if platform error-code semantics for pretty-name resolution evolve.
+
+## Main push update (2026-03-15 05:07 UTC)
+
+1. TODOs completed since last push:
+   1. Updated `README.md` with the latest main-branch push status entry.
+   2. Logged current push context so repository history remains traceable from docs.
+2. Git build references:
+   1. `pending-commit-hash` (replaced in push status message for this run).
+3. New understandings/learnings:
+   1. Keeping push-status sections current in `README.md` preserves an auditable narrative aligned with main-branch delivery.
+4. Understood next steps (remaining TODOs):
+   1. Replace placeholder build reference with the actual commit hash in the next README status refresh.
