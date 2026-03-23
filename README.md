@@ -179,3 +179,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Keep monitoring backend workflow transitions until decision endpoints persist updated `moderation_submission.status_code` values.
    2. Expand moderation status filter UX to enum choices when backend starts persisting additional status values.
+
+## Main push update (2026-03-23 02:08 UTC)
+
+1. TODOs completed since last push:
+   1. Fixed moderation approve integration by sending the required backend body model (`submission_id`, `current_status`, `actor_id`, `actor_role`, optional `approval_note`).
+   2. Aligned reject/request-changes/escalate/resolve-escalation request bodies to the current backend decision schemas.
+   3. Added required manual operator fields (`actor_id`, `actor_role`) and transition fields (`current_status`, `resolution`) in moderation action forms.
+   4. Expanded moderation action tests for new required field validation and decision endpoint payload signatures.
+2. Git build references:
+   1. `68e7fb6`
+3. New understandings/learnings:
+   1. Moderation decision endpoints now enforce explicit actor and transition metadata, so admin actions must be schema-complete even when legacy UI actions looked body-light.
+   2. `requested_by` is not part of moderation decision endpoint schemas and should not be used as a substitute for `actor_id`/`actor_role`.
+4. Understood next steps (remaining TODOs):
+   1. Validate live end-to-end approval/reject/escalation transitions against backend transition guardrails (`invalid_moderation_transition` paths).
+   2. Consider adding shared operator identity persistence in UI state if repeated manual entry becomes operationally expensive.
