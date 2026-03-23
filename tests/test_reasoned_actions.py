@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app import deps
+from app.services.platform_api import PlatformApiError
 
 
 client = TestClient(app)
@@ -159,3 +160,28 @@ def test_resolve_escalation_requires_resolution(monkeypatch):
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
     assert called["value"] is False
+
+
+def test_approve_maps_status_conflict_error(monkeypatch):
+    async def fake_approve(**_kwargs):
+        raise PlatformApiError(
+            409,
+            "stale status",
+            "moderation_status_conflict",
+        )
+
+    monkeypatch.setattr(deps.platform_client, "approve_submission", fake_approve)
+
+    response = client.post(
+        "/moderation/sub-1/approve",
+        data={
+            "current_status": "submitted_pending_review",
+            "actor_id": "admin@smallfarms.com.au",
+            "actor_role": "admin_operator",
+            "approval_note": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert "Submission+status+changed.+Refresh+the+queue+and+retry." in response.headers["location"]

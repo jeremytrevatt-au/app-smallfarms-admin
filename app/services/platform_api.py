@@ -67,8 +67,25 @@ class PlatformApiClient:
             response_body: Any = response.text
             try:
                 body = response.json()
-                message = body.get("message") or body.get("error") or message
-                error_code = body.get("code") or body.get("error_code") or ""
+                nested_error = body.get("error")
+                if isinstance(nested_error, dict):
+                    message = (
+                        nested_error.get("message")
+                        or body.get("message")
+                        or body.get("detail")
+                        or message
+                    )
+                    error_code = (
+                        nested_error.get("code")
+                        or body.get("code")
+                        or body.get("error_code")
+                        or ""
+                    )
+                else:
+                    message = body.get("message") or body.get("detail") or nested_error or message
+                    error_code = body.get("code") or body.get("error_code") or ""
+                if not isinstance(message, str):
+                    message = str(message)
                 response_body = body
             except ValueError:
                 pass

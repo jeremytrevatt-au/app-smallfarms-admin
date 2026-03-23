@@ -2,6 +2,7 @@ from fastapi import APIRouter, Form
 
 from app.deps import platform_client
 from app.models.forms import parse_reason_form, parse_transition_form
+from app.routes._moderation_error_messages import moderation_action_error
 from app.routes._redirects import moderation_redirect
 from app.services.platform_api import PlatformApiError
 
@@ -41,4 +42,4 @@ async def reject_submission(
         )
         return moderation_redirect("Submission rejected.")
     except PlatformApiError as exc:
-        return moderation_redirect(f"Reject failed: {exc.message}", level="error")
+        return moderation_redirect(moderation_action_error("Reject", exc), level="error")

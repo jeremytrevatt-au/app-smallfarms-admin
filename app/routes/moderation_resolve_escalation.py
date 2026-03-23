@@ -2,6 +2,7 @@ from fastapi import APIRouter, Form
 
 from app.deps import platform_client
 from app.models.forms import parse_actor_form
+from app.routes._moderation_error_messages import moderation_action_error
 from app.routes._redirects import moderation_redirect
 from app.services.platform_api import PlatformApiError
 
@@ -36,4 +37,7 @@ async def resolve_escalation(
         )
         return moderation_redirect("Escalation resolved.")
     except PlatformApiError as exc:
-        return moderation_redirect(f"Resolve escalation failed: {exc.message}", level="error")
+        return moderation_redirect(
+            moderation_action_error("Resolve escalation", exc),
+            level="error",
+        )
