@@ -211,3 +211,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Consider adding similar error-code mapping patterns for non-moderation admin domains as backend contracts stabilize.
    2. Evaluate auto-refresh of moderation queue after successful decisions to reduce stale-state retries.
+
+## Main push update (2026-03-23 22:05 UTC)
+
+1. TODOs completed since last push:
+   1. Updated moderation queue UX to add one-click filters for pending submissions and auto-approved submissions.
+   2. Surfaced `submission_payload.auto_approved_after_initial_moderation` in moderation submission details.
+   3. Gated manual moderation controls by status so non-actionable statuses (for example `approved_pending_publish`) show a no-manual-action message.
+   4. Added regression coverage for auto-approved status rendering behavior in moderation page tests.
+2. Git build references:
+   1. `c2c7a0a`
+3. New understandings/learnings:
+   1. Queue defaults can remain pending-focused while still supporting operational review of auto-approved outcomes through explicit status filters.
+   2. Status-aware action gating reduces operator confusion and avoids presenting decision controls where manual moderation is not expected.
+4. Understood next steps (remaining TODOs):
+   1. Validate escalated-only resolve flow against live payloads to ensure status-driven control visibility remains aligned with backend transition rules.
+   2. Consider adding operator-facing explanation text for why controls are hidden on terminal statuses.
