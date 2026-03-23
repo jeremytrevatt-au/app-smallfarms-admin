@@ -158,8 +158,24 @@ Python web admin app for moderation operations, escalation handling, policy exec
    1. Updated `README.md` with the latest main-branch push status entry.
    2. Logged current push context so repository history remains traceable from docs.
 2. Git build references:
-   1. `pending-commit-hash` (replaced in push status message for this run).
+   1. `a9299bc`
 3. New understandings/learnings:
    1. Keeping push-status sections current in `README.md` preserves an auditable narrative aligned with main-branch delivery.
 4. Understood next steps (remaining TODOs):
    1. Replace placeholder build reference with the actual commit hash in the next README status refresh.
+
+## Main push update (2026-03-23 01:22 UTC)
+
+1. TODOs completed since last push:
+   1. Aligned admin moderation queue loading to the live DB-backed submissions contract with `status`, `page`, and `page_size` query support.
+   2. Migrated moderation UI cards to the new item schema (`submission_id`, `listing_id`, `status_code`, `submitted_by_member_id`, `submitted_at`, `submission_payload`).
+   3. Added sandboxed iframe rendering for stable `submission_payload.preview_html` and preserved moderation decision actions by `submission_id`.
+   4. Updated moderation tests to validate contract mapping, query forwarding, and pagination bound handling.
+2. Git build references:
+   1. `fc346ab`
+3. New understandings/learnings:
+   1. Backend now treats `submission_payload.preview_html` as the stable admin preview field and supports direct iframe `srcdoc` rendering with sandbox hardening.
+   2. Unknown moderation `status` values return empty result sets rather than errors, so admin filters should preserve operator-entered status strings.
+4. Understood next steps (remaining TODOs):
+   1. Keep monitoring backend workflow transitions until decision endpoints persist updated `moderation_submission.status_code` values.
+   2. Expand moderation status filter UX to enum choices when backend starts persisting additional status values.
