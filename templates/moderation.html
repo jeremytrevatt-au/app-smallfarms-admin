@@ -67,10 +67,30 @@
     <form method="post" action="/moderation/{{ item.get('submission_id') }}/claim">
       <button type="submit" class="btn">Claim</button>
     </form>
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/approve">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/approve" class="action-form">
+      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+      <label>Actor ID</label>
+      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Actor Role</label>
+      <input name="actor_role" required placeholder="e.g. admin_operator">
+      <label>Approval Note (optional)</label>
+      <textarea name="approval_note" placeholder="Optional approval context"></textarea>
       <button type="submit" class="btn btn-success">Approve</button>
     </form>
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/resolve-escalation">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/resolve-escalation" class="action-form">
+      <label>Actor ID</label>
+      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Actor Role</label>
+      <input name="actor_role" required placeholder="e.g. admin_operator">
+      <label>Resolution</label>
+      <select name="resolution" required>
+        <option value="">Select resolution</option>
+        <option value="approve">approve</option>
+        <option value="reject">reject</option>
+        <option value="request_changes">request_changes</option>
+      </select>
+      <label>Review Notes (optional)</label>
+      <textarea name="review_notes" placeholder="Optional resolution notes"></textarea>
       <button type="submit" class="btn">Resolve Escalation</button>
     </form>
   </div>
@@ -78,28 +98,41 @@
   <div class="grid-3">
     <form method="post" action="/moderation/{{ item.get('submission_id') }}/reject" class="action-form">
       <h4>Reject (reason required)</h4>
+      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+      <label>Actor ID</label>
+      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Actor Role</label>
+      <input name="actor_role" required placeholder="e.g. admin_operator">
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. POLICY_VIOLATION">
-      <label>Note</label>
-      <textarea name="note" placeholder="Optional context"></textarea>
+      <label>Review Notes</label>
+      <textarea name="note" required placeholder="Required review notes"></textarea>
       <button type="submit" class="btn btn-danger">Reject</button>
     </form>
 
     <form method="post" action="/moderation/{{ item.get('submission_id') }}/request-changes" class="action-form">
       <h4>Request Changes (reason required)</h4>
+      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+      <label>Actor ID</label>
+      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Actor Role</label>
+      <input name="actor_role" required placeholder="e.g. admin_operator">
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. INCOMPLETE_METADATA">
-      <label>Note</label>
-      <textarea name="note" placeholder="Required edits for submitter"></textarea>
+      <label>Review Notes</label>
+      <textarea name="note" required placeholder="Required edits for submitter"></textarea>
       <button type="submit" class="btn btn-warning">Request Changes</button>
     </form>
 
     <form method="post" action="/moderation/{{ item.get('submission_id') }}/escalate" class="action-form">
       <h4>Escalate (reason required)</h4>
+      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+      <label>Actor ID</label>
+      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+      <label>Actor Role</label>
+      <input name="actor_role" required placeholder="e.g. admin_operator">
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. LEGAL_REVIEW">
-      <label>Note</label>
-      <textarea name="note" placeholder="Escalation details"></textarea>
       <button type="submit" class="btn btn-secondary">Escalate</button>
     </form>
   </div>

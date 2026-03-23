@@ -158,41 +158,112 @@ class PlatformApiClient:
             "POST", f"/v1/admin/moderation/submissions/{submission_id}/claim"
         )
 
-    async def approve_submission(self, submission_id: str) -> dict[str, Any]:
+    async def approve_submission(
+        self,
+        submission_id: str,
+        current_status: str,
+        actor_id: str,
+        actor_role: str,
+        approval_note: str = "",
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "submission_id": submission_id,
+            "current_status": current_status,
+            "actor_id": actor_id,
+            "actor_role": actor_role,
+        }
+        if approval_note.strip():
+            payload["approval_note"] = approval_note.strip()
         return await self._request(
-            "POST", f"/v1/admin/moderation/submissions/{submission_id}/approve"
+            "POST",
+            f"/v1/admin/moderation/submissions/{submission_id}/approve",
+            payload,
         )
 
     async def reject_submission(
-        self, submission_id: str, reason_code: str, note: str
+        self,
+        submission_id: str,
+        current_status: str,
+        actor_id: str,
+        actor_role: str,
+        reason_code: str,
+        review_notes: str,
     ) -> dict[str, Any]:
         return await self._request(
             "POST",
             f"/v1/admin/moderation/submissions/{submission_id}/reject",
-            {"reason_code": reason_code, "note": note},
+            {
+                "submission_id": submission_id,
+                "current_status": current_status,
+                "actor_id": actor_id,
+                "actor_role": actor_role,
+                "reason_codes": [reason_code],
+                "review_notes": review_notes,
+            },
         )
 
     async def request_changes(
-        self, submission_id: str, reason_code: str, note: str
+        self,
+        submission_id: str,
+        current_status: str,
+        actor_id: str,
+        actor_role: str,
+        reason_code: str,
+        review_notes: str,
     ) -> dict[str, Any]:
         return await self._request(
             "POST",
             f"/v1/admin/moderation/submissions/{submission_id}/request-changes",
-            {"reason_code": reason_code, "note": note},
+            {
+                "submission_id": submission_id,
+                "current_status": current_status,
+                "actor_id": actor_id,
+                "actor_role": actor_role,
+                "reason_codes": [reason_code],
+                "review_notes": review_notes,
+            },
         )
 
     async def escalate_submission(
-        self, submission_id: str, reason_code: str, note: str
+        self,
+        submission_id: str,
+        current_status: str,
+        actor_id: str,
+        actor_role: str,
+        reason_code: str,
     ) -> dict[str, Any]:
         return await self._request(
             "POST",
             f"/v1/admin/moderation/submissions/{submission_id}/escalate",
-            {"reason_code": reason_code, "note": note},
+            {
+                "submission_id": submission_id,
+                "current_status": current_status,
+                "actor_id": actor_id,
+                "actor_role": actor_role,
+                "reason_code": reason_code,
+            },
         )
 
-    async def resolve_escalation(self, submission_id: str) -> dict[str, Any]:
+    async def resolve_escalation(
+        self,
+        submission_id: str,
+        actor_id: str,
+        actor_role: str,
+        resolution: str,
+        review_notes: str = "",
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "submission_id": submission_id,
+            "actor_id": actor_id,
+            "actor_role": actor_role,
+            "resolution": resolution,
+        }
+        if review_notes.strip():
+            payload["review_notes"] = review_notes.strip()
         return await self._request(
-            "POST", f"/v1/admin/moderation/submissions/{submission_id}/resolve-escalation"
+            "POST",
+            f"/v1/admin/moderation/submissions/{submission_id}/resolve-escalation",
+            payload,
         )
 
     async def list_audit_events(self) -> dict[str, Any]:
