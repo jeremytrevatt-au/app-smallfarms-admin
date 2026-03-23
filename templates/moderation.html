@@ -26,6 +26,8 @@
   </form>
   <p>Page {{ page }} of {{ total_pages }} | Total matching submissions: {{ total }}</p>
   <div class="button-row">
+    <a class="btn" href="/moderation?status=submitted_pending_review&page=1&page_size={{ page_size }}">Pending queue</a>
+    <a class="btn" href="/moderation?status=approved_pending_publish&page=1&page_size={{ page_size }}">View auto-approved</a>
     {% if has_prev_page %}
       <a class="btn" href="/moderation?status={{ status }}&page={{ prev_page }}&page_size={{ page_size }}">Previous</a>
     {% endif %}
@@ -51,6 +53,17 @@
   <h4>Submission Payload</h4>
   <p>Draft ID: {{ payload.get('draft_id') or '-' }}</p>
   <p>Submission Note: {{ payload.get('submission_note') or '-' }}</p>
+  {% set auto_approved = payload.get('auto_approved_after_initial_moderation') %}
+  <p>
+    Auto-approved after initial moderation:
+    {% if auto_approved is sameas true %}
+      true
+    {% elif auto_approved is sameas false %}
+      false
+    {% else %}
+      -
+    {% endif %}
+  </p>
   <h4>Preview HTML</h4>
   {% if payload.get('preview_html') %}
     <iframe
@@ -63,79 +76,87 @@
     <p>No HTML preview provided.</p>
   {% endif %}
 
-  <div class="button-row">
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/claim">
-      <button type="submit" class="btn">Claim</button>
-    </form>
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/approve" class="action-form">
-      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
-      <label>Actor ID</label>
-      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
-      <label>Actor Role</label>
-      <input name="actor_role" required placeholder="e.g. admin_operator">
-      <label>Approval Note (optional)</label>
-      <textarea name="approval_note" placeholder="Optional approval context"></textarea>
-      <button type="submit" class="btn btn-success">Approve</button>
-    </form>
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/resolve-escalation" class="action-form">
-      <label>Actor ID</label>
-      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
-      <label>Actor Role</label>
-      <input name="actor_role" required placeholder="e.g. admin_operator">
-      <label>Resolution</label>
-      <select name="resolution" required>
-        <option value="">Select resolution</option>
-        <option value="approve">approve</option>
-        <option value="reject">reject</option>
-        <option value="request_changes">request_changes</option>
-      </select>
-      <label>Review Notes (optional)</label>
-      <textarea name="review_notes" placeholder="Optional resolution notes"></textarea>
-      <button type="submit" class="btn">Resolve Escalation</button>
-    </form>
-  </div>
+  {% set status_code = item.get('status_code', '') %}
+  {% if status_code == 'submitted_pending_review' %}
+    <div class="button-row">
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/claim">
+        <button type="submit" class="btn">Claim</button>
+      </form>
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/approve" class="action-form">
+        <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+        <label>Actor ID</label>
+        <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+        <label>Actor Role</label>
+        <input name="actor_role" required placeholder="e.g. admin_operator">
+        <label>Approval Note (optional)</label>
+        <textarea name="approval_note" placeholder="Optional approval context"></textarea>
+        <button type="submit" class="btn btn-success">Approve</button>
+      </form>
+    </div>
 
-  <div class="grid-3">
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/reject" class="action-form">
-      <h4>Reject (reason required)</h4>
-      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
-      <label>Actor ID</label>
-      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
-      <label>Actor Role</label>
-      <input name="actor_role" required placeholder="e.g. admin_operator">
-      <label>Reason Code</label>
-      <input name="reason_code" required placeholder="e.g. POLICY_VIOLATION">
-      <label>Review Notes</label>
-      <textarea name="note" required placeholder="Required review notes"></textarea>
-      <button type="submit" class="btn btn-danger">Reject</button>
-    </form>
+    <div class="grid-3">
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/reject" class="action-form">
+        <h4>Reject (reason required)</h4>
+        <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+        <label>Actor ID</label>
+        <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+        <label>Actor Role</label>
+        <input name="actor_role" required placeholder="e.g. admin_operator">
+        <label>Reason Code</label>
+        <input name="reason_code" required placeholder="e.g. POLICY_VIOLATION">
+        <label>Review Notes</label>
+        <textarea name="note" required placeholder="Required review notes"></textarea>
+        <button type="submit" class="btn btn-danger">Reject</button>
+      </form>
 
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/request-changes" class="action-form">
-      <h4>Request Changes (reason required)</h4>
-      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
-      <label>Actor ID</label>
-      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
-      <label>Actor Role</label>
-      <input name="actor_role" required placeholder="e.g. admin_operator">
-      <label>Reason Code</label>
-      <input name="reason_code" required placeholder="e.g. INCOMPLETE_METADATA">
-      <label>Review Notes</label>
-      <textarea name="note" required placeholder="Required edits for submitter"></textarea>
-      <button type="submit" class="btn btn-warning">Request Changes</button>
-    </form>
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/request-changes" class="action-form">
+        <h4>Request Changes (reason required)</h4>
+        <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+        <label>Actor ID</label>
+        <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+        <label>Actor Role</label>
+        <input name="actor_role" required placeholder="e.g. admin_operator">
+        <label>Reason Code</label>
+        <input name="reason_code" required placeholder="e.g. INCOMPLETE_METADATA">
+        <label>Review Notes</label>
+        <textarea name="note" required placeholder="Required edits for submitter"></textarea>
+        <button type="submit" class="btn btn-warning">Request Changes</button>
+      </form>
 
-    <form method="post" action="/moderation/{{ item.get('submission_id') }}/escalate" class="action-form">
-      <h4>Escalate (reason required)</h4>
-      <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
-      <label>Actor ID</label>
-      <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
-      <label>Actor Role</label>
-      <input name="actor_role" required placeholder="e.g. admin_operator">
-      <label>Reason Code</label>
-      <input name="reason_code" required placeholder="e.g. LEGAL_REVIEW">
-      <button type="submit" class="btn btn-secondary">Escalate</button>
-    </form>
-  </div>
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/escalate" class="action-form">
+        <h4>Escalate (reason required)</h4>
+        <input type="hidden" name="current_status" value="{{ item.get('status_code', '') }}">
+        <label>Actor ID</label>
+        <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+        <label>Actor Role</label>
+        <input name="actor_role" required placeholder="e.g. admin_operator">
+        <label>Reason Code</label>
+        <input name="reason_code" required placeholder="e.g. LEGAL_REVIEW">
+        <button type="submit" class="btn btn-secondary">Escalate</button>
+      </form>
+    </div>
+  {% elif status_code == 'escalated_policy_review' %}
+    <div class="button-row">
+      <form method="post" action="/moderation/{{ item.get('submission_id') }}/resolve-escalation" class="action-form">
+        <label>Actor ID</label>
+        <input name="actor_id" required placeholder="e.g. admin@smallfarms.com.au">
+        <label>Actor Role</label>
+        <input name="actor_role" required placeholder="e.g. admin_operator">
+        <label>Resolution</label>
+        <select name="resolution" required>
+          <option value="">Select resolution</option>
+          <option value="approve">approve</option>
+          <option value="reject">reject</option>
+          <option value="request_changes">request_changes</option>
+        </select>
+        <label>Review Notes (optional)</label>
+        <textarea name="review_notes" placeholder="Optional resolution notes"></textarea>
+        <button type="submit" class="btn">Resolve Escalation</button>
+      </form>
+    </div>
+  {% else %}
+    <p>No manual moderation required for this status.</p>
+  {% endif %}
 </section>
 {% else %}
 <section class="card">

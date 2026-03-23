@@ -22,6 +22,7 @@ def test_moderation_page_loads(monkeypatch):
                         "draft_id": "draft-123",
                         "submission_note": "first note",
                         "preview_html": "<section><h1>Preview</h1><p>Safe paragraph</p></section>",
+                        "auto_approved_after_initial_moderation": False,
                     },
                 }
             ],
@@ -39,6 +40,9 @@ def test_moderation_page_loads(monkeypatch):
     assert "submitted_pending_review" in response.text
     assert "Draft ID: draft-123" in response.text
     assert "Submission Note: first note" in response.text
+    assert "Auto-approved after initial moderation:" in response.text
+    assert "Pending queue" in response.text
+    assert "View auto-approved" in response.text
     assert "Submission Preview sub-123" in response.text
 
 
@@ -66,6 +70,36 @@ def test_moderation_page_renders_payload_defaults(monkeypatch):
     assert "Draft ID: -" in response.text
     assert "Submission Note: -" in response.text
     assert "No HTML preview provided." in response.text
+
+
+def test_moderation_page_hides_manual_actions_for_auto_approved_status(monkeypatch):
+    async def fake_list_submissions(status=None, page=None, page_size=None):
+        return {
+            "items": [
+                {
+                    "submission_id": "sub-auto",
+                    "listing_id": "listing-auto",
+                    "status_code": "approved_pending_publish",
+                    "submitted_by_member_id": "member-789",
+                    "submitted_at": "2026-03-23T02:52:00",
+                    "submission_payload": {
+                        "draft_id": "draft-auto",
+                        "auto_approved_after_initial_moderation": True,
+                    },
+                }
+            ],
+            "page": 1,
+            "page_size": 25,
+            "total": 1,
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation?status=approved_pending_publish")
+    assert response.status_code == 200
+    assert "No manual moderation required for this status." in response.text
+    assert "auto_approved_after_initial_moderation" not in response.text
+    assert "Approve" not in response.text
+    assert "Reject" not in response.text
 
 
 def test_moderation_page_forwards_filters_and_pagination(monkeypatch):
