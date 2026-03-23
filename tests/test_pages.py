@@ -9,152 +9,103 @@ client = TestClient(app)
 
 
 def test_moderation_page_loads(monkeypatch):
-    async def fake_list_submissions():
-        return {"items": [{"id": "sub-123", "status": "pending"}]}
+    async def fake_list_submissions(status=None, page=None, page_size=None):
+        return {
+            "items": [
+                {
+                    "submission_id": "sub-123",
+                    "listing_id": "listing-123",
+                    "status_code": "submitted_pending_review",
+                    "submitted_by_member_id": "member-123",
+                    "submitted_at": "2026-03-23T01:14:24",
+                    "submission_payload": {
+                        "draft_id": "draft-123",
+                        "submission_note": "first note",
+                        "preview_html": "<section><h1>Preview</h1><p>Safe paragraph</p></section>",
+                    },
+                }
+            ],
+            "page": 1,
+            "page_size": 25,
+            "total": 1,
+        }
 
     monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
     response = client.get("/moderation")
     assert response.status_code == 200
     assert "Moderation Queue" in response.text
+    assert "Submission sub-123" in response.text
+    assert "Listing ID: listing-123" in response.text
+    assert "submitted_pending_review" in response.text
+    assert "Draft ID: draft-123" in response.text
+    assert "Submission Note: first note" in response.text
+    assert "Submission Preview sub-123" in response.text
 
 
-def test_moderation_page_renders_public_read_model_defaults(monkeypatch):
-    async def fake_list_submissions():
+def test_moderation_page_renders_payload_defaults(monkeypatch):
+    async def fake_list_submissions(status=None, page=None, page_size=None):
         return {
             "items": [
                 {
-                    "id": "sub-defaults",
-                    "status": "pending",
+                    "submission_id": "sub-456",
+                    "listing_id": "listing-456",
+                    "status_code": "submitted_pending_review",
+                    "submitted_by_member_id": "member-456",
+                    "submitted_at": "2026-03-23T01:14:24",
+                    "submission_payload": {},
                 }
-            ]
+            ],
+            "page": 1,
+            "page_size": 25,
+            "total": 1,
         }
 
     monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
     response = client.get("/moderation")
     assert response.status_code == 200
-    assert "Public Read Model Snapshot" in response.text
-    assert "is_premium: false" in response.text
-    assert "is_claimed: false" in response.text
-    assert "Pretty Name: -" in response.text
-    assert "Canonical Path: -" in response.text
-    assert "Tags: []" in response.text
-    assert "Location Address: -" in response.text
-    assert "Website: -" in response.text
-    assert "Phone: -" in response.text
+    assert "Draft ID: -" in response.text
+    assert "Submission Note: -" in response.text
+    assert "No HTML preview provided." in response.text
 
 
-def test_moderation_page_renders_contact_fields(monkeypatch):
-    async def fake_list_submissions():
+def test_moderation_page_forwards_filters_and_pagination(monkeypatch):
+    seen: dict[str, object] = {}
+
+    async def fake_list_submissions(status=None, page=None, page_size=None):
+        seen["status"] = status
+        seen["page"] = page
+        seen["page_size"] = page_size
+        return {"items": [], "page": page or 1, "page_size": page_size or 25, "total": 0}
+
+    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
+    response = client.get("/moderation?status=submitted_pending_review&page=2&page_size=10")
+    assert response.status_code == 200
+    assert seen["status"] == "submitted_pending_review"
+    assert seen["page"] == 2
+    assert seen["page_size"] == 10
+    assert "Page 2 of 1 | Total matching submissions: 0" in response.text
+
+
+def test_moderation_page_clamps_invalid_pagination(monkeypatch):
+    seen: dict[str, object] = {}
+
+    async def fake_list_submissions(status=None, page=None, page_size=None):
+        seen["status"] = status
+        seen["page"] = page
+        seen["page_size"] = page_size
         return {
-            "items": [
-                {
-                    "id": "sub-123",
-                    "status": "pending",
-                    "contact": {
-                        "website_url": "https://examplefarm.com.au",
-                        "phone_number": "+61 3 9000 0000",
-                        "social_urls": {
-                            "facebook": "https://facebook.com/examplefarm",
-                            "instagram": None,
-                        },
-                    },
-                }
-            ]
+            "items": [],
+            "page": page or 1,
+            "page_size": page_size or 25,
+            "total": 0,
         }
 
     monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
-    response = client.get("/moderation")
+    response = client.get("/moderation?status=&page=0&page_size=999")
     assert response.status_code == 200
-    assert "Contact Preview" in response.text
-    assert "https://examplefarm.com.au" in response.text
-    assert "+61 3 9000 0000" in response.text
-    assert "https://facebook.com/examplefarm" in response.text
-
-
-def test_moderation_page_renders_nullable_contact_fields(monkeypatch):
-    async def fake_list_submissions():
-        return {
-            "items": [
-                {
-                    "id": "sub-456",
-                    "status": "pending",
-                    "contact": None,
-                }
-            ]
-        }
-
-    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
-    response = client.get("/moderation")
-    assert response.status_code == 200
-    assert "Contact Preview" in response.text
-    assert "Website: -" in response.text
-    assert "Phone: -" in response.text
-
-
-def test_moderation_page_renders_public_model_from_nested_listing(monkeypatch):
-    async def fake_list_submissions():
-        return {
-            "items": [
-                {
-                    "id": "sub-nested",
-                    "status": "pending",
-                    "listing": {
-                        "display_name": "Example Farm",
-                        "pretty_name": "example-farm",
-                        "canonical_path": "/farm/example-farm",
-                        "is_premium": True,
-                        "is_claimed": True,
-                        "primary_category_code": "microgreens",
-                        "farm_type_code": "microgreens",
-                        "summary": "Premium microgreen supplier",
-                        "location": {
-                            "lat": -27.4705,
-                            "lng": 153.0260,
-                            "formatted_address": "Brisbane QLD, Australia",
-                            "precision_flag": "exact",
-                            "viewport_hint": {},
-                        },
-                        "tags": [{"code": "microgreens", "label": "Microgreens"}],
-                        "contact": {
-                            "website_url": "https://examplefarm.com.au",
-                            "phone_number": "+61 3 9000 0000",
-                            "social_urls": {},
-                        },
-                    },
-                }
-            ]
-        }
-
-    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
-    response = client.get("/moderation")
-    assert response.status_code == 200
-    assert "Example Farm" in response.text
-    assert "Pretty Name: example-farm" in response.text
-    assert "Canonical Path: /farm/example-farm" in response.text
-    assert "is_premium: true" in response.text
-    assert "is_claimed: true" in response.text
-    assert "microgreens" in response.text
-    assert "Brisbane QLD, Australia" in response.text
-
-
-def test_moderation_page_normalizes_partial_tag_entries(monkeypatch):
-    async def fake_list_submissions():
-        return {
-            "items": [
-                {
-                    "id": "sub-tags",
-                    "status": "pending",
-                    "listing": {
-                        "tags": [{"code": "flowers"}, "invalid-item"],
-                    },
-                }
-            ]
-        }
-
-    monkeypatch.setattr(deps.platform_client, "list_submissions", fake_list_submissions)
-    response = client.get("/moderation")
-    assert response.status_code == 200
-    assert '{"code": "flowers", "label": ""}' in response.text
+    assert seen["status"] == "submitted_pending_review"
+    assert seen["page"] == 1
+    assert seen["page_size"] == 100
 
 
 def test_billing_page_read_only(monkeypatch):

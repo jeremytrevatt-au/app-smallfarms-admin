@@ -30,7 +30,11 @@ class PlatformApiClient:
         return headers
 
     async def _request(
-        self, method: str, path: str, json_body: dict[str, Any] | None = None
+        self,
+        method: str,
+        path: str,
+        json_body: dict[str, Any] | None = None,
+        query_params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
         started_at = datetime.now(timezone.utc)
@@ -42,6 +46,7 @@ class PlatformApiClient:
                     url=url,
                     headers=self._headers(),
                     json=json_body,
+                    params=query_params,
                 )
         except httpx.RequestError as exc:
             latency_ms = int((time.perf_counter() - start_perf) * 1000)
@@ -129,8 +134,24 @@ class PlatformApiClient:
             }
         )
 
-    async def list_submissions(self) -> dict[str, Any]:
-        return await self._request("GET", "/v1/admin/moderation/submissions")
+    async def list_submissions(
+        self,
+        status: str | None = None,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> dict[str, Any]:
+        query_params: dict[str, Any] = {}
+        if status:
+            query_params["status"] = status
+        if page is not None:
+            query_params["page"] = page
+        if page_size is not None:
+            query_params["page_size"] = page_size
+        return await self._request(
+            "GET",
+            "/v1/admin/moderation/submissions",
+            query_params=query_params or None,
+        )
 
     async def claim_submission(self, submission_id: str) -> dict[str, Any]:
         return await self._request(

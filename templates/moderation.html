@@ -9,69 +9,74 @@
   {% if error_message %}
     <div class="alert error">{{ error_message }}</div>
   {% endif %}
+  <form method="get" action="/moderation" class="grid-3">
+    <div>
+      <label>Status</label>
+      <input name="status" value="{{ status }}" placeholder="submitted_pending_review">
+    </div>
+    <div>
+      <label>Page Size</label>
+      <input type="number" name="page_size" value="{{ page_size }}" min="1" max="100">
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <input type="hidden" name="page" value="1">
+      <button type="submit" class="btn">Apply Filters</button>
+    </div>
+  </form>
+  <p>Page {{ page }} of {{ total_pages }} | Total matching submissions: {{ total }}</p>
+  <div class="button-row">
+    {% if has_prev_page %}
+      <a class="btn" href="/moderation?status={{ status }}&page={{ prev_page }}&page_size={{ page_size }}">Previous</a>
+    {% endif %}
+    {% if has_next_page %}
+      <a class="btn" href="/moderation?status={{ status }}&page={{ next_page }}&page_size={{ page_size }}">Next</a>
+    {% endif %}
+  </div>
 </section>
 
 {% for item in submissions %}
 <section class="card">
   <div class="row space-between">
     <div>
-      <h3>Submission {{ item.get('id', 'unknown') }}</h3>
-      <p>Status: <strong>{{ item.get('status', 'unknown') }}</strong></p>
-      <p>Tenant: {{ item.get('tenant_id', 'n/a') }}</p>
-      <p>Submitted By: {{ item.get('submitted_by', 'n/a') }}</p>
+      <h3>Submission {{ item.get('submission_id', 'unknown') }}</h3>
+      <p>Status: <strong>{{ item.get('status_code', 'unknown') }}</strong></p>
+      <p>Listing ID: {{ item.get('listing_id', 'n/a') }}</p>
+      <p>Submitted By Member: {{ item.get('submitted_by_member_id', 'n/a') }}</p>
+      <p>Submitted At: {{ item.get('submitted_at', 'n/a') }}</p>
     </div>
   </div>
 
-  {% set public_model = item.get('admin_public_read_model', {}) %}
-  <h4>Public Read Model Snapshot</h4>
-  <p>Display Name: {{ public_model.get('display_name') or '-' }}</p>
-  <p>Pretty Name: {{ public_model.get('pretty_name') or '-' }}</p>
-  <p>Canonical Path: {{ public_model.get('canonical_path') or '-' }}</p>
-  <p>is_premium: {% if public_model.get('is_premium') %}true{% else %}false{% endif %}</p>
-  <p>is_claimed: {% if public_model.get('is_claimed') %}true{% else %}false{% endif %}</p>
-  <p>Primary Category: {{ public_model.get('primary_category_code') or '-' }}</p>
-  <p>Farm Type (compat): {{ public_model.get('farm_type_code') or '-' }}</p>
-  <p>Summary: {{ public_model.get('summary') or '-' }}</p>
-  {% set location = public_model.get('location', {}) %}
-  <p>Location Address: {{ location.get('formatted_address') or '-' }}</p>
-  <p>Location Lat/Lng: {{ location.get('lat') if location.get('lat') is not none else '-' }} / {{ location.get('lng') if location.get('lng') is not none else '-' }}</p>
-  {% set tags = public_model.get('tags', []) %}
-  <p>Tags: {% if tags %}{{ tags | tojson }}{% else %}[]{% endif %}</p>
-
-  {% set contact = public_model.get('contact', {}) %}
-  <h4>Contact Preview</h4>
-  <p>Website: {{ contact.get('website_url') or '-' }}</p>
-  <p>Phone: {{ contact.get('phone_number') or '-' }}</p>
-  <p>
-    Social:
-    {% set social = contact.get('social_urls', {}) %}
-    {% if social and social is mapping %}
-      facebook={{ social.get('facebook') or '-' }},
-      instagram={{ social.get('instagram') or '-' }},
-      youtube={{ social.get('youtube') or '-' }},
-      x={{ social.get('x') or '-' }},
-      tiktok={{ social.get('tiktok') or '-' }},
-      linkedin={{ social.get('linkedin') or '-' }},
-      other={{ social.get('other') or '-' }}
-    {% else %}
-      -
-    {% endif %}
-  </p>
+  {% set payload = item.get('submission_payload', {}) %}
+  <h4>Submission Payload</h4>
+  <p>Draft ID: {{ payload.get('draft_id') or '-' }}</p>
+  <p>Submission Note: {{ payload.get('submission_note') or '-' }}</p>
+  <h4>Preview HTML</h4>
+  {% if payload.get('preview_html') %}
+    <iframe
+      title="Submission Preview {{ item.get('submission_id', 'unknown') }}"
+      sandbox
+      style="width: 100%; min-height: 280px; border: 1px solid #ddd; border-radius: 4px;"
+      srcdoc="{{ payload.get('preview_html') }}"
+    ></iframe>
+  {% else %}
+    <p>No HTML preview provided.</p>
+  {% endif %}
 
   <div class="button-row">
-    <form method="post" action="/moderation/{{ item.get('id') }}/claim">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/claim">
       <button type="submit" class="btn">Claim</button>
     </form>
-    <form method="post" action="/moderation/{{ item.get('id') }}/approve">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/approve">
       <button type="submit" class="btn btn-success">Approve</button>
     </form>
-    <form method="post" action="/moderation/{{ item.get('id') }}/resolve-escalation">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/resolve-escalation">
       <button type="submit" class="btn">Resolve Escalation</button>
     </form>
   </div>
 
   <div class="grid-3">
-    <form method="post" action="/moderation/{{ item.get('id') }}/reject" class="action-form">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/reject" class="action-form">
       <h4>Reject (reason required)</h4>
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. POLICY_VIOLATION">
@@ -80,7 +85,7 @@
       <button type="submit" class="btn btn-danger">Reject</button>
     </form>
 
-    <form method="post" action="/moderation/{{ item.get('id') }}/request-changes" class="action-form">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/request-changes" class="action-form">
       <h4>Request Changes (reason required)</h4>
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. INCOMPLETE_METADATA">
@@ -89,7 +94,7 @@
       <button type="submit" class="btn btn-warning">Request Changes</button>
     </form>
 
-    <form method="post" action="/moderation/{{ item.get('id') }}/escalate" class="action-form">
+    <form method="post" action="/moderation/{{ item.get('submission_id') }}/escalate" class="action-form">
       <h4>Escalate (reason required)</h4>
       <label>Reason Code</label>
       <input name="reason_code" required placeholder="e.g. LEGAL_REVIEW">

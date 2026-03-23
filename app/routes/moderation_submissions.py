@@ -6,94 +6,67 @@ from app.services.platform_api import PlatformApiError
 
 router = APIRouter()
 
-
-def _source_listing(item: dict) -> dict:
-    for key in ("listing", "public_listing", "listing_snapshot"):
-        candidate = item.get(key)
-        if isinstance(candidate, dict):
-            return candidate
-    return item
+DEFAULT_STATUS = "submitted_pending_review"
+DEFAULT_PAGE = 1
+DEFAULT_PAGE_SIZE = 25
+MAX_PAGE_SIZE = 100
 
 
-def _normalized_contact(item: dict) -> dict:
-    direct = item.get("contact")
-    if isinstance(direct, dict):
-        return direct
-    profile = item.get("profile")
-    if isinstance(profile, dict) and isinstance(profile.get("contact"), dict):
-        return profile["contact"]
-    profile_patch = item.get("profile_patch")
-    if isinstance(profile_patch, dict) and isinstance(profile_patch.get("contact"), dict):
-        return profile_patch["contact"]
-    return {}
-
-
-def _normalized_public_read_model(item: dict) -> dict:
-    source = _source_listing(item)
-    tags_raw = source.get("tags")
-    tags: list[dict] = []
-    if isinstance(tags_raw, list):
-        for entry in tags_raw:
-            if not isinstance(entry, dict):
-                continue
-            tags.append(
-                {
-                    "code": str(entry.get("code") or ""),
-                    "label": str(entry.get("label") or ""),
-                }
-            )
-    contact = _normalized_contact(source)
-    social_urls = contact.get("social_urls")
-    if not isinstance(social_urls, dict):
-        social_urls = {}
-    location = source.get("location")
-    if not isinstance(location, dict):
-        location = {}
-    normalized_location = {
-        "lat": location.get("lat"),
-        "lng": location.get("lng"),
-        "formatted_address": str(location.get("formatted_address") or ""),
-        "precision_flag": str(location.get("precision_flag") or ""),
-        "viewport_hint": location.get("viewport_hint")
-        if isinstance(location.get("viewport_hint"), dict)
-        else {},
-    }
-    normalized_contact = {
-        "website_url": str(contact.get("website_url") or ""),
-        "phone_number": str(contact.get("phone_number") or ""),
-        "social_urls": social_urls,
-    }
-    return {
-        "display_name": str(source.get("display_name") or ""),
-        "pretty_name": str(source.get("pretty_name") or ""),
-        "canonical_path": str(source.get("canonical_path") or ""),
-        "is_premium": bool(source.get("is_premium", False)),
-        "is_claimed": bool(source.get("is_claimed", False)),
-        "primary_category_code": str(source.get("primary_category_code") or ""),
-        "farm_type_code": str(source.get("farm_type_code") or ""),
-        "summary": str(source.get("summary") or ""),
-        "location": normalized_location,
-        "contact": normalized_contact,
-        "tags": tags,
-    }
+def _parse_int(
+    value: str | None,
+    default: int,
+    minimum: int,
+    maximum: int | None = None,
+) -> int:
+    try:
+        parsed = int(value) if value is not None else default
+    except ValueError:
+        return default
+    if parsed < minimum:
+        return minimum
+    if maximum is not None and parsed > maximum:
+        return maximum
+    return parsed
 
 
 @router.get("/moderation", include_in_schema=False)
 async def moderation_queue(request: Request, message: str = "", level: str = "success"):
+    status = (request.query_params.get("status") or DEFAULT_STATUS).strip() or DEFAULT_STATUS
+    page = _parse_int(request.query_params.get("page"), DEFAULT_PAGE, 1)
+    page_size = _parse_int(
+        request.query_params.get("page_size"),
+        DEFAULT_PAGE_SIZE,
+        1,
+        MAX_PAGE_SIZE,
+    )
+
     submissions: list[dict] = []
     error_message = ""
+    response_page = page
+    response_page_size = page_size
+    total = 0
     try:
-        payload = await platform_client.list_submissions()
-        raw_submissions = payload.get("items", payload if isinstance(payload, list) else [])
+        payload = await platform_client.list_submissions(
+            status=status,
+            page=page,
+            page_size=page_size,
+        )
+        raw_submissions = payload.get("items", [])
         if isinstance(raw_submissions, list):
             for item in raw_submissions:
-                if not isinstance(item, dict):
-                    continue
-                prepared = dict(item)
-                prepared["admin_public_read_model"] = _normalized_public_read_model(item)
-                submissions.append(prepared)
+                if isinstance(item, dict):
+                    submissions.append(item)
+        response_page = _parse_int(str(payload.get("page")), page, 1)
+        response_page_size = _parse_int(str(payload.get("page_size")), page_size, 1, MAX_PAGE_SIZE)
+        total = _parse_int(str(payload.get("total")), len(submissions), 0)
     except PlatformApiError as exc:
         error_message = f"Failed to load moderation queue: {exc.message}"
+
+    total_pages = (
+        (total + response_page_size - 1) // response_page_size if response_page_size > 0 else 1
+    )
+    if total_pages < 1:
+        total_pages = 1
 
     return templates.TemplateResponse(
         request=request,
@@ -101,6 +74,15 @@ async def moderation_queue(request: Request, message: str = "", level: str = "su
         context={
             "active_page": "moderation",
             "submissions": submissions,
+            "status": status,
+            "page": response_page,
+            "page_size": response_page_size,
+            "total": total,
+            "total_pages": total_pages,
+            "has_prev_page": response_page > 1,
+            "has_next_page": response_page < total_pages,
+            "prev_page": response_page - 1 if response_page > 1 else 1,
+            "next_page": response_page + 1 if response_page < total_pages else total_pages,
             "message": message,
             "level": level,
             "error_message": error_message,
