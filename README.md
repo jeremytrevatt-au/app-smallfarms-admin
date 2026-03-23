@@ -195,3 +195,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Validate live end-to-end approval/reject/escalation transitions against backend transition guardrails (`invalid_moderation_transition` paths).
    2. Consider adding shared operator identity persistence in UI state if repeated manual entry becomes operationally expensive.
+
+## Main push update (2026-03-23 03:20 UTC)
+
+1. TODOs completed since last push:
+   1. Added moderation action error mapping for backend codes (`moderation_status_conflict`, `submission_not_found`, `validation_failed`, `invalid_moderation_transition`).
+   2. Replaced raw backend error payload display with operator-friendly moderation action messages.
+   3. Improved platform API error parsing to extract nested backend `error.code` and `error.message` reliably.
+   4. Added regression coverage to verify approve conflict mapping shows a refresh-and-retry message.
+2. Git build references:
+   1. `5f8474e`
+3. New understandings/learnings:
+   1. Backend error payloads can be nested under `error`, so client-side parsing must handle nested and flat error contracts consistently.
+   2. Action-specific error text significantly reduces operator confusion compared to surfacing raw response objects.
+4. Understood next steps (remaining TODOs):
+   1. Consider adding similar error-code mapping patterns for non-moderation admin domains as backend contracts stabilize.
+   2. Evaluate auto-refresh of moderation queue after successful decisions to reduce stale-state retries.
