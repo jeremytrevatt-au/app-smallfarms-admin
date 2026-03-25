@@ -132,38 +132,13 @@ def _normalize_canonical_tags(response: dict) -> list[dict]:
     return normalized
 
 
-def _listing_options_from_grouped(grouped_items: list[dict]) -> list[dict]:
-    options: list[dict] = []
-    for entry in grouped_items:
-        listing_id = str(entry.get("listing_id") or "").strip()
-        if not listing_id:
-            continue
-        tags_raw = entry.get("tags")
-        selected_codes: list[str] = []
-        if isinstance(tags_raw, list):
-            for tag in tags_raw:
-                if not isinstance(tag, dict):
-                    continue
-                code = str(tag.get("tag_code") or "").strip()
-                if code:
-                    selected_codes.append(code)
-        options.append(
-            {
-                "listing_id": listing_id,
-                "listing_name": str(entry.get("listing_name") or listing_id),
-                "latest_assigned_at": str(entry.get("latest_assigned_at") or ""),
-                "selected_tag_codes": selected_codes,
-            }
-        )
-    return options
-
-
 def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
     matched: list[dict] = []
     for entry in api_log_store.list_newest_first():
         path = str(entry.get("path", ""))
         if (
             "/v1/admin/listing-tag-assignments" in path
+            or "/v1/admin/listings" in path
             or "/v1/admin/listings/" in path
             and "/tag-assignments" in path
         ):
@@ -171,6 +146,29 @@ def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
         if len(matched) >= limit:
             break
     return matched
+
+
+def _normalize_listing_options(response: dict) -> list[dict]:
+    raw = response.get("items", [])
+    if not isinstance(raw, list):
+        return []
+    options: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        listing_id = str(entry.get("listing_id") or "").strip()
+        if not listing_id:
+            continue
+        listing_name = str(entry.get("listing_name") or listing_id).strip() or listing_id
+        options.append(
+            {
+                "listing_id": listing_id,
+                "listing_name": listing_name,
+                "latest_assigned_at": "",
+                "selected_tag_codes": [],
+            }
+        )
+    return options
 
 
 @router.get("/listing-tags", include_in_schema=False)
@@ -224,18 +222,12 @@ async def listing_tags_page(request: Request):
         level = "error"
 
     try:
-        listing_selector_response = await platform_client.list_listing_tag_assignments(
+        listing_selector_response = await platform_client.list_admin_listings(
             listing_name=listing_name,
-            tag_name="",
             page=1,
             page_size=100,
-            group_by_listing=True,
         )
-        selector_grouped = listing_selector_response.get("grouped_items", [])
-        if isinstance(selector_grouped, list):
-            listing_options = _listing_options_from_grouped(
-                [entry for entry in selector_grouped if isinstance(entry, dict)]
-            )
+        listing_options = _normalize_listing_options(listing_selector_response)
     except PlatformApiError as exc:
         if not message:
             message = (
@@ -256,8 +248,35 @@ async def listing_tags_page(request: Request):
         for option in listing_options:
             if option["listing_id"] == selected_listing_id:
                 selected_listing_name = option["listing_name"]
-                selected_listing_tag_codes = option["selected_tag_codes"]
                 break
+        if selected_listing_name:
+            try:
+                selected_assignments_response = await platform_client.list_listing_tag_assignments(
+                    listing_name=selected_listing_name,
+                    tag_name="",
+                    page=1,
+                    page_size=100,
+                    group_by_listing=True,
+                )
+                selected_grouped = selected_assignments_response.get("grouped_items", [])
+                if isinstance(selected_grouped, list):
+                    for grouped_entry in selected_grouped:
+                        if not isinstance(grouped_entry, dict):
+                            continue
+                        if str(grouped_entry.get("listing_id") or "") != selected_listing_id:
+                            continue
+                        tags_raw = grouped_entry.get("tags", [])
+                        if isinstance(tags_raw, list):
+                            for tag in tags_raw:
+                                if not isinstance(tag, dict):
+                                    continue
+                                code = str(tag.get("tag_code") or "").strip()
+                                if code:
+                                    selected_listing_tag_codes.append(code)
+                        break
+            except PlatformApiError:
+                # Keep editor usable even if preselection lookup fails.
+                selected_listing_tag_codes = []
 
     total_pages = (
         (total + response_page_size - 1) // response_page_size if response_page_size > 0 else 1

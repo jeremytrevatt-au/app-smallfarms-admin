@@ -21,8 +21,24 @@ def _mock_canonical_tags(monkeypatch):
     monkeypatch.setattr(deps.platform_client, "list_canonical_tags", fake_list_canonical_tags)
 
 
+def _mock_listing_catalog(monkeypatch):
+    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
+        return {
+            "items": [
+                {"listing_id": "listing-1", "listing_name": "Example Farm"},
+                {"listing_id": "listing-2", "listing_name": "Beta Farm"},
+            ],
+            "page": page,
+            "page_size": page_size,
+            "total": 2,
+        }
+
+    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
+
+
 def test_listing_tags_page_loads(monkeypatch):
     _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
 
     async def fake_list_listing_tag_assignments(
         listing_name="",
@@ -71,7 +87,14 @@ def test_listing_tags_page_loads(monkeypatch):
 
 def test_listing_tags_filters_forwarded(monkeypatch):
     _mock_canonical_tags(monkeypatch)
+    seen_catalog = {}
     calls = []
+
+    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
+        seen_catalog["listing_name"] = listing_name
+        seen_catalog["page"] = page
+        seen_catalog["page_size"] = page_size
+        return {"items": [], "page": page, "page_size": page_size, "total": 0}
 
     async def fake_list_listing_tag_assignments(
         listing_name="",
@@ -96,6 +119,7 @@ def test_listing_tags_filters_forwarded(monkeypatch):
         "list_listing_tag_assignments",
         fake_list_listing_tag_assignments,
     )
+    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
     response = client.get(
         "/listing-tags?listing_name=Example&tag_name=Micro&page=2&page_size=10&group_by_listing=false"
     )
@@ -105,14 +129,14 @@ def test_listing_tags_filters_forwarded(monkeypatch):
     assert calls[0]["page"] == 2
     assert calls[0]["page_size"] == 10
     assert calls[0]["group_by_listing"] is False
-    assert calls[1]["listing_name"] == "Example"
-    assert calls[1]["tag_name"] == ""
-    assert calls[1]["page"] == 1
-    assert calls[1]["group_by_listing"] is True
+    assert seen_catalog["listing_name"] == "Example"
+    assert seen_catalog["page"] == 1
+    assert seen_catalog["page_size"] == 100
 
 
 def test_listing_tags_grouped_view(monkeypatch):
     _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
 
     async def fake_list_listing_tag_assignments(
         listing_name="",
@@ -158,6 +182,7 @@ def test_listing_tags_grouped_view(monkeypatch):
 
 def test_listing_tags_load_error_503(monkeypatch):
     _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
 
     async def fake_list_listing_tag_assignments(
         listing_name="",
@@ -180,6 +205,7 @@ def test_listing_tags_load_error_503(monkeypatch):
 
 def test_listing_tags_page_shows_related_api_logs(monkeypatch):
     _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
 
     async def fake_list_listing_tag_assignments(
         listing_name="",
@@ -216,6 +242,8 @@ def test_listing_tags_page_shows_related_api_logs(monkeypatch):
 
 
 def test_replace_listing_tags_success(monkeypatch):
+    _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["microgreens", "flowers"]
@@ -242,6 +270,8 @@ def test_replace_listing_tags_success(monkeypatch):
 
 
 def test_replace_listing_tags_unknown_code(monkeypatch):
+    _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["unknown_tag"]
@@ -268,6 +298,8 @@ def test_replace_listing_tags_unknown_code(monkeypatch):
 
 
 def test_replace_listing_tags_from_checkboxes(monkeypatch):
+    _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["microgreens", "flowers"]
@@ -291,3 +323,55 @@ def test_replace_listing_tags_from_checkboxes(monkeypatch):
 
     assert response.status_code == 200
     assert "Listing tag assignments updated." in response.text
+
+
+def test_listing_tags_editor_preselects_existing_assignment(monkeypatch):
+    _mock_canonical_tags(monkeypatch)
+    _mock_listing_catalog(monkeypatch)
+
+    calls = []
+
+    async def fake_list_listing_tag_assignments(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        group_by_listing=False,
+    ):
+        calls.append(
+            {
+                "listing_name": listing_name,
+                "tag_name": tag_name,
+                "page": page,
+                "page_size": page_size,
+                "group_by_listing": group_by_listing,
+            }
+        )
+        if group_by_listing:
+            return {
+                "items": [],
+                "grouped_items": [
+                    {
+                        "listing_id": "listing-1",
+                        "listing_name": "Example Farm",
+                        "latest_assigned_at": "2026-03-25T08:10:00Z",
+                        "tags": [{"tag_code": "microgreens"}],
+                    }
+                ],
+                "page": 1,
+                "page_size": 100,
+                "total": 1,
+            }
+        return {"items": [], "page": 1, "page_size": 25, "total": 0}
+
+    monkeypatch.setattr(
+        deps.platform_client,
+        "list_listing_tag_assignments",
+        fake_list_listing_tag_assignments,
+    )
+    response = client.get("/listing-tags?selected_listing_id=listing-1")
+    assert response.status_code == 200
+    assert "Selected Listing:" in response.text
+    assert "Example Farm" in response.text
+    assert calls[1]["listing_name"] == "Example Farm"
+    assert calls[1]["group_by_listing"] is True

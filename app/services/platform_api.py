@@ -328,6 +328,24 @@ class PlatformApiClient:
     async def list_canonical_tags(self) -> dict[str, Any]:
         return await self._request("GET", "/v1/admin/tags")
 
+    async def list_admin_listings(
+        self,
+        listing_name: str = "",
+        page: int = 1,
+        page_size: int = 25,
+    ) -> dict[str, Any]:
+        query_params: dict[str, Any] = {
+            "page": page,
+            "page_size": page_size,
+        }
+        if listing_name.strip():
+            query_params["listing_name"] = listing_name.strip()
+        return await self._request(
+            "GET",
+            "/v1/admin/listings",
+            query_params=query_params,
+        )
+
     async def replace_listing_tag_assignments(
         self,
         listing_id: str,
