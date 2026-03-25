@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Form, Request
 
 from app.deps import platform_client, templates
+from app.services.api_log_store import api_log_store
 from app.services.platform_api import PlatformApiError
 
 
@@ -43,6 +44,7 @@ def _render_listing_tags(
     group_by_listing: bool = False,
     items: list[dict] | None = None,
     grouped_items: list[dict] | None = None,
+    api_log_items: list[dict] | None = None,
     listing_id: str = "",
     tag_codes_csv: str = "",
     reason_code: str = "",
@@ -65,6 +67,7 @@ def _render_listing_tags(
             "group_by_listing": group_by_listing,
             "items": items or [],
             "grouped_items": grouped_items or [],
+            "api_log_items": api_log_items or [],
             "has_prev_page": page > 1,
             "has_next_page": page < total_pages,
             "prev_page": page - 1 if page > 1 else 1,
@@ -84,6 +87,21 @@ def _assignment_error_message(exc: PlatformApiError) -> str:
     if exc.status_code == 503:
         return "database_unavailable: listing tag assignment service unavailable."
     return f"Tag assignment failed: {exc.message}"
+
+
+def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
+    matched: list[dict] = []
+    for entry in api_log_store.list_newest_first():
+        path = str(entry.get("path", ""))
+        if (
+            "/v1/admin/listing-tag-assignments" in path
+            or "/v1/admin/listings/" in path
+            and "/tag-assignments" in path
+        ):
+            matched.append(entry)
+        if len(matched) >= limit:
+            break
+    return matched
 
 
 @router.get("/listing-tags", include_in_schema=False)
@@ -149,6 +167,7 @@ async def listing_tags_page(request: Request):
         group_by_listing=group_by_listing,
         items=items,
         grouped_items=grouped_items,
+        api_log_items=_listing_tag_api_logs(),
     )
 
 
@@ -170,6 +189,7 @@ async def replace_listing_tags(
             tag_codes_csv=tag_codes_csv,
             reason_code=reason_code,
             requested_by=requested_by,
+            api_log_items=_listing_tag_api_logs(),
         )
 
     try:
@@ -188,6 +208,7 @@ async def replace_listing_tags(
             reason_code=reason_code,
             requested_by=requested_by,
             result=result,
+            api_log_items=_listing_tag_api_logs(),
         )
     except PlatformApiError as exc:
         return _render_listing_tags(
@@ -198,4 +219,5 @@ async def replace_listing_tags(
             tag_codes_csv=tag_codes_csv,
             reason_code=reason_code,
             requested_by=requested_by,
+            api_log_items=_listing_tag_api_logs(),
         )

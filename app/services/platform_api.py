@@ -56,6 +56,7 @@ class PlatformApiClient:
                 started_at=started_at,
                 latency_ms=latency_ms,
                 request_body=json_body,
+                request_query=query_params,
                 status_code=503,
                 response_body={"error": f"Platform API unreachable: {exc}"},
             )
@@ -96,6 +97,7 @@ class PlatformApiClient:
                 started_at=started_at,
                 latency_ms=latency_ms,
                 request_body=json_body,
+                request_query=query_params,
                 status_code=response.status_code,
                 response_body=response_body,
             )
@@ -110,6 +112,7 @@ class PlatformApiClient:
                 started_at=started_at,
                 latency_ms=latency_ms,
                 request_body=json_body,
+                request_query=query_params,
                 status_code=response.status_code,
                 response_body=response_json,
             )
@@ -121,6 +124,7 @@ class PlatformApiClient:
             started_at=started_at,
             latency_ms=latency_ms,
             request_body=json_body,
+            request_query=query_params,
             status_code=response.status_code,
             response_body=response_json,
         )
@@ -133,11 +137,10 @@ class PlatformApiClient:
         started_at: datetime,
         latency_ms: int,
         request_body: dict[str, Any] | None,
+        request_query: dict[str, Any] | None,
         status_code: int,
         response_body: Any,
     ) -> None:
-        if method.upper() != "POST":
-            return
         api_log_store.add(
             {
                 "started_at_utc": started_at.isoformat(),
@@ -145,6 +148,7 @@ class PlatformApiClient:
                 "method": method.upper(),
                 "path": path,
                 "request_body": request_body or {},
+                "request_query": request_query or {},
                 "status_code": status_code,
                 "response_body": response_body,
                 "latency_ms": latency_ms,

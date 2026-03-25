@@ -18,6 +18,7 @@ class ApiLogStore:
     def add(self, item: dict[str, Any]) -> None:
         clipped = dict(item)
         clipped["request_body"] = _clip(clipped.get("request_body"))
+        clipped["request_query"] = _clip(clipped.get("request_query"))
         clipped["response_body"] = _clip(clipped.get("response_body"))
         with self._lock:
             self._items.append(clipped)

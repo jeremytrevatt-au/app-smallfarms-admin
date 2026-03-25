@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app import deps
+from app.services.api_log_store import api_log_store
 from app.services.platform_api import PlatformApiError
 
 
@@ -144,6 +145,41 @@ def test_listing_tags_load_error_503(monkeypatch):
     response = client.get("/listing-tags")
     assert response.status_code == 200
     assert "database_unavailable: listing tag assignment service unavailable." in response.text
+
+
+def test_listing_tags_page_shows_related_api_logs(monkeypatch):
+    async def fake_list_listing_tag_assignments(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        group_by_listing=False,
+    ):
+        return {"items": [], "page": 1, "page_size": 25, "total": 0}
+
+    monkeypatch.setattr(
+        deps.platform_client,
+        "list_listing_tag_assignments",
+        fake_list_listing_tag_assignments,
+    )
+    api_log_store.add(
+        {
+            "started_at_utc": "2026-03-25T07:10:00+00:00",
+            "finished_at_utc": "2026-03-25T07:10:00+00:00",
+            "method": "GET",
+            "path": "/v1/admin/listing-tag-assignments",
+            "request_body": {},
+            "request_query": {"listing_name": "example"},
+            "status_code": 404,
+            "response_body": {"detail": "Not Found"},
+            "latency_ms": 100,
+        }
+    )
+    response = client.get("/listing-tags")
+    assert response.status_code == 200
+    assert "API Request/Response Log" in response.text
+    assert "/v1/admin/listing-tag-assignments" in response.text
+    assert "Not Found" in response.text
 
 
 def test_replace_listing_tags_success(monkeypatch):

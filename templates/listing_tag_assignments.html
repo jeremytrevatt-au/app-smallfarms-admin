@@ -142,4 +142,43 @@
   <pre>{{ result | tojson(indent=2) }}</pre>
 </section>
 {% endif %}
+
+<section class="card">
+  <h3>API Request/Response Log</h3>
+  <p>Latest outbound platform API calls related to listing tag assignment reads/writes.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Started (UTC)</th>
+        <th>Method</th>
+        <th>Path</th>
+        <th>Status</th>
+        <th>Latency (ms)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in api_log_items %}
+      <tr>
+        <td>{{ item.get('started_at_utc', '-') }}</td>
+        <td>{{ item.get('method', '-') }}</td>
+        <td>{{ item.get('path', '-') }}</td>
+        <td>{{ item.get('status_code', '-') }}</td>
+        <td>{{ item.get('latency_ms', '-') }}</td>
+      </tr>
+      <tr>
+        <td colspan="5">
+          <details>
+            <summary>Full Request/Response</summary>
+            <pre>{{ item | tojson(indent=2) }}</pre>
+          </details>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5">No matching API logs yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 {% endblock %}
