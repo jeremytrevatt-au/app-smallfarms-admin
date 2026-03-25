@@ -2,13 +2,127 @@
 {% block content %}
 <section class="card">
   <h2>Listing Tag Assignments</h2>
-  <p>Replace active listing tags using canonical tag codes only.</p>
+  <p>Review existing active tag assignments and replace tags using canonical tag codes.</p>
   {% if message %}
     <div class="alert {{ level }}">{{ message }}</div>
   {% endif %}
 </section>
 
 <section class="card">
+  <h3>Assignment Filters</h3>
+  <form method="get" action="/listing-tags" class="grid-3">
+    <div>
+      <label>Listing Name</label>
+      <input name="listing_name" value="{{ listing_name }}" placeholder="contains match">
+    </div>
+    <div>
+      <label>Tag Name</label>
+      <input name="tag_name" value="{{ tag_name }}" placeholder="contains match">
+    </div>
+    <div>
+      <label>Page Size</label>
+      <input type="number" name="page_size" min="1" max="100" value="{{ page_size }}">
+    </div>
+    <div>
+      <label>View Mode</label>
+      <select name="group_by_listing">
+        <option value="false" {% if not group_by_listing %}selected{% endif %}>Row view</option>
+        <option value="true" {% if group_by_listing %}selected{% endif %}>Grouped by listing</option>
+      </select>
+    </div>
+    <div>
+      <input type="hidden" name="page" value="1">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn">Apply Filters</button>
+    </div>
+  </form>
+  <p>Page {{ page }} of {{ total_pages }} | Total matching assignments: {{ total }}</p>
+  <div class="button-row">
+    {% if has_prev_page %}
+      <a class="btn" href="/listing-tags?listing_name={{ listing_name }}&tag_name={{ tag_name }}&page={{ prev_page }}&page_size={{ page_size }}&group_by_listing={{ 'true' if group_by_listing else 'false' }}">Previous</a>
+    {% endif %}
+    {% if has_next_page %}
+      <a class="btn" href="/listing-tags?listing_name={{ listing_name }}&tag_name={{ tag_name }}&page={{ next_page }}&page_size={{ page_size }}&group_by_listing={{ 'true' if group_by_listing else 'false' }}">Next</a>
+    {% endif %}
+  </div>
+</section>
+
+{% if group_by_listing %}
+<section class="card">
+  <h3>Grouped Assignments</h3>
+  {% for listing in grouped_items %}
+    <section class="card">
+      <h4>{{ listing.get("listing_name", "-") }}</h4>
+      <p>Listing ID: {{ listing.get("listing_id", "-") }}</p>
+      <p>Latest Assigned At: {{ listing.get("latest_assigned_at", "-") }}</p>
+      {% set tags = listing.get("tags", []) %}
+      {% if tags %}
+        <table>
+          <thead>
+            <tr>
+              <th>Tag Code</th>
+              <th>Tag Name</th>
+              <th>Assigned At</th>
+              <th>Assigned By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tag in tags %}
+              <tr>
+                <td>{{ tag.get("tag_code", "-") }}</td>
+                <td>{{ tag.get("tag_name", "-") }}</td>
+                <td>{{ tag.get("assigned_at", "-") }}</td>
+                <td>{{ tag.get("assigned_by", "-") }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No tag assignments found for this listing.</p>
+      {% endif %}
+    </section>
+  {% else %}
+    <p>No listing tag assignments found.</p>
+  {% endfor %}
+</section>
+{% else %}
+<section class="card">
+  <h3>Assignment Rows</h3>
+  {% if items %}
+    <table>
+      <thead>
+        <tr>
+          <th>Listing Name</th>
+          <th>Listing ID</th>
+          <th>Tag Name</th>
+          <th>Tag Code</th>
+          <th>Assigned At</th>
+          <th>Assigned By</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in items %}
+          <tr>
+            <td>{{ row.get("listing_name", "-") }}</td>
+            <td>{{ row.get("listing_id", "-") }}</td>
+            <td>{{ row.get("tag_name", "-") }}</td>
+            <td>{{ row.get("tag_code", "-") }}</td>
+            <td>{{ row.get("assigned_at", "-") }}</td>
+            <td>{{ row.get("assigned_by", "-") }}</td>
+            <td>{% if row.get("is_active_assignment") %}true{% else %}false{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No listing tag assignments found.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h3>Replace Listing Tag Assignments</h3>
   <form method="post" action="/listing-tags" class="action-form">
     <label>Listing ID</label>
     <input name="listing_id" value="{{ listing_id }}" required placeholder="listing-123">

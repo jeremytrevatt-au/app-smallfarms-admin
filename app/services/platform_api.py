@@ -338,6 +338,30 @@ class PlatformApiClient:
             },
         )
 
+    async def list_listing_tag_assignments(
+        self,
+        listing_name: str = "",
+        tag_name: str = "",
+        page: int = 1,
+        page_size: int = 25,
+        group_by_listing: bool = False,
+    ) -> dict[str, Any]:
+        query_params: dict[str, Any] = {
+            "page": page,
+            "page_size": page_size,
+        }
+        if listing_name.strip():
+            query_params["listing_name"] = listing_name.strip()
+        if tag_name.strip():
+            query_params["tag_name"] = tag_name.strip()
+        if group_by_listing:
+            query_params["group_by_listing"] = "true"
+        return await self._request(
+            "GET",
+            "/v1/admin/listing-tag-assignments",
+            query_params=query_params,
+        )
+
     async def patch_admin_listing(
         self,
         listing_id: str,
