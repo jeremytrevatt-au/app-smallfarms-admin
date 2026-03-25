@@ -53,6 +53,44 @@ def test_listing_tags_page_loads(monkeypatch):
     assert "Listing/Tag Matrix Editor" in response.text
 
 
+def test_listing_tags_page_loads_with_code_label_tag_shape(monkeypatch):
+    async def fake_list_listing_tag_matrix(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        include_inactive_tags=False,
+    ):
+        assert include_inactive_tags is False
+        return {
+            "tags": [
+                {"code": "microgreens", "label": "Microgreens", "is_active": True},
+                {"code": "flowers", "label": "Flowers", "is_active": True},
+            ],
+            "items": [
+                {
+                    "listing_id": "listing-1",
+                    "listing_name": "Example Farm",
+                    "assigned_tag_codes": ["microgreens"],
+                }
+            ],
+            "page": page,
+            "page_size": page_size,
+            "total": 1,
+        }
+
+    monkeypatch.setattr(
+        deps.platform_client,
+        "list_listing_tag_matrix",
+        fake_list_listing_tag_matrix,
+    )
+    response = client.get("/listing-tags")
+    assert response.status_code == 200
+    assert "Example Farm" in response.text
+    assert "Microgreens" in response.text
+    assert 'name="selected_tags__listing-1"' in response.text
+
+
 def test_listing_tags_filters_forwarded(monkeypatch):
     seen = {}
     calls = []

@@ -165,11 +165,14 @@ def _normalize_matrix_payload(response: dict) -> tuple[list[dict], list[dict], d
     for entry in raw_tags:
         if not isinstance(entry, dict):
             continue
-        tag_code = str(entry.get("tag_code") or "").strip()
+        tag_code = str(entry.get("tag_code") or entry.get("code") or "").strip()
         if not tag_code:
             continue
         tag_name = str(
-            entry.get("tag_name") or entry.get("tag_label") or entry.get("label") or tag_code
+            entry.get("tag_name")
+            or entry.get("tag_label")
+            or entry.get("label")
+            or tag_code
         ).strip() or tag_code
         canonical_tags.append(
             {
