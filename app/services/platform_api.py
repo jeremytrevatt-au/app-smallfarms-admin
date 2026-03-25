@@ -35,12 +35,14 @@ class PlatformApiClient:
         path: str,
         json_body: dict[str, Any] | None = None,
         query_params: dict[str, Any] | None = None,
+        timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
         started_at = datetime.now(timezone.utc)
         start_perf = time.perf_counter()
+        timeout = timeout_seconds if timeout_seconds is not None else self._timeout
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.request(
                     method=method,
                     url=url,
@@ -409,6 +411,7 @@ class PlatformApiClient:
             "GET",
             "/v1/admin/listing-tag-matrix",
             query_params=query_params,
+            timeout_seconds=60.0,
         )
 
     async def apply_listing_tag_matrix_updates(
