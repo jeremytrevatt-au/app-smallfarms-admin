@@ -338,3 +338,18 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Add incremental UX enhancements for wide grids (for example sticky first column/header) if operator usage expands to larger tag catalogs.
    2. Monitor matrix apply response patterns in production logs to tune operator-facing status summaries and failure guidance text.
+
+## Main push update (2026-03-25 22:07 UTC)
+
+1. TODOs completed since last push:
+   1. Fixed listing-tag matrix rendering compatibility for backend tag column payloads that use `code` and `label` keys.
+   2. Restored correct checked-state rendering for previously assigned tags by accepting both `tag_code` and `code` response shapes.
+   3. Added regression coverage for matrix loading with `tags[]` entries shaped as `{code, label, is_active}`.
+2. Git build references:
+   1. `44d164f`
+3. New understandings/learnings:
+   1. Endpoint contract drift on field naming (`tag_code` vs `code`) can silently collapse matrix columns unless parser normalization is explicitly dual-shape aware.
+   2. Matrix UI conditional rendering requires both rows and tag columns, so tag normalization mismatches can appear as missing rows even when listing row payloads are valid.
+4. Understood next steps (remaining TODOs):
+   1. Remove legacy view-mode selector text from listing-tag filters to align UI labels with the now matrix-only rendering path.
+   2. Add lightweight on-page diagnostics for matrix parse totals (rows loaded, tag columns loaded) to speed up future contract troubleshooting.
