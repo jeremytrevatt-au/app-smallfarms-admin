@@ -353,3 +353,18 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Remove legacy view-mode selector text from listing-tag filters to align UI labels with the now matrix-only rendering path.
    2. Add lightweight on-page diagnostics for matrix parse totals (rows loaded, tag columns loaded) to speed up future contract troubleshooting.
+
+## Main push update (2026-03-25 23:21 UTC)
+
+1. TODOs completed since last push:
+   1. Added per-request timeout override support to the admin platform API client request helper.
+   2. Raised `GET /v1/admin/listing-tag-matrix` client timeout to `60s` to cover slower matrix-read query windows.
+   3. Re-validated listing-tag and page suites after timeout changes to confirm no regression in matrix page behavior.
+2. Git build references:
+   1. `16bd72d`
+3. New understandings/learnings:
+   1. Matrix read latency can exceed the default shared API timeout under larger data windows, so endpoint-specific timeout tuning prevents avoidable client-side 503 surfacing.
+   2. A per-endpoint timeout override keeps global defaults conservative while permitting longer read windows only where needed.
+4. Understood next steps (remaining TODOs):
+   1. Monitor matrix read latency distribution in production logs to decide whether 60s should remain fixed or become environment-configurable.
+   2. Consider adding explicit timeout diagnostics in matrix error messaging to differentiate transport timeout versus backend contract failures.
