@@ -303,11 +303,12 @@ class PlatformApiClient:
         )
 
     async def import_places(self, payload: dict[str, Any], dry_run: bool) -> dict[str, Any]:
-        flag = "true" if dry_run else "false"
+        request_payload = dict(payload)
+        request_payload["dry_run"] = dry_run
         return await self._request(
             "POST",
-            f"/v1/admin/places/import?dry_run={flag}",
-            payload,
+            "/v1/admin/places/import",
+            request_payload,
         )
 
     async def upsert_tags(self, requested_by: str, tags: list[dict[str, Any]]) -> dict[str, Any]:
