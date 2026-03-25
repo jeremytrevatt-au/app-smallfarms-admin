@@ -227,3 +227,18 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Validate escalated-only resolve flow against live payloads to ensure status-driven control visibility remains aligned with backend transition rules.
    2. Consider adding operator-facing explanation text for why controls are hidden on terminal statuses.
+
+## Main push update (2026-03-25 06:09 UTC)
+
+1. TODOs completed since last push:
+   1. Updated admin places import transport to use JSON-body `dry_run` instead of `dry_run` query-string parameterization.
+   2. Kept harvest jobs POST behavior on JSON body transport, confirming no parameterized request path usage for the existing harvest preview integration.
+   3. Validated targeted harvest/import suites after transport alignment to ensure no UI or import preflight regressions.
+2. Git build references:
+   1. `498f427`
+3. New understandings/learnings:
+   1. Current admin code path already matched JSON body contracts for harvest job creation; places import was the only parameterized POST transport in active use.
+   2. Kill-switch and Stripe webhook endpoints are currently not implemented/consumed in this admin codebase, so no local contract migration was required for those routes.
+4. Understood next steps (remaining TODOs):
+   1. Add kill-switch admin controls only when backend exposes/requests corresponding admin UX entry points for activate/deactivate operations.
+   2. Re-check webhook transport assumptions if Stripe webhook tooling is introduced into this repository.
