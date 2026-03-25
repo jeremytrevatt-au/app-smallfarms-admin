@@ -82,7 +82,7 @@ def test_listing_tags_page_loads(monkeypatch):
     assert "Listing Tag Assignments" in response.text
     assert "Example Farm" in response.text
     assert "Microgreens" in response.text
-    assert "Listing Tag Editor" in response.text
+    assert "Listing/Tag Matrix Editor" in response.text
 
 
 def test_listing_tags_filters_forwarded(monkeypatch):
@@ -175,9 +175,8 @@ def test_listing_tags_grouped_view(monkeypatch):
     )
     response = client.get("/listing-tags?group_by_listing=true")
     assert response.status_code == 200
-    assert "Grouped Assignments" in response.text
+    assert "Listing/Tag Matrix Editor" in response.text
     assert "Example Farm" in response.text
-    assert "latest_assigned_at" not in response.text
 
 
 def test_listing_tags_load_error_503(monkeypatch):
@@ -371,7 +370,100 @@ def test_listing_tags_editor_preselects_existing_assignment(monkeypatch):
     )
     response = client.get("/listing-tags?selected_listing_id=listing-1")
     assert response.status_code == 200
-    assert "Selected Listing:" in response.text
+    assert 'name="selected_tags__listing-1"' in response.text
     assert "Example Farm" in response.text
     assert calls[1]["listing_name"] == "Example Farm"
     assert calls[1]["group_by_listing"] is True
+
+
+def test_apply_listing_tag_matrix_updates_only_changed_rows(monkeypatch):
+    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
+        return {
+            "items": [
+                {"listing_id": "listing-1", "listing_name": "Example Farm"},
+                {"listing_id": "listing-2", "listing_name": "Beta Farm"},
+            ],
+            "page": page,
+            "page_size": page_size,
+            "total": 2,
+        }
+
+    async def fake_list_canonical_tags():
+        return {
+            "items": [
+                {"tag_code": "microgreens", "tag_name": "Microgreens", "is_active": True},
+                {"tag_code": "flowers", "tag_name": "Flowers", "is_active": True},
+            ]
+        }
+
+    async def fake_list_listing_tag_assignments(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        group_by_listing=False,
+    ):
+        if group_by_listing and listing_name == "Example Farm":
+            return {
+                "items": [],
+                "grouped_items": [
+                    {
+                        "listing_id": "listing-1",
+                        "listing_name": "Example Farm",
+                        "tags": [{"tag_code": "microgreens"}],
+                    }
+                ],
+                "page": 1,
+                "page_size": 100,
+                "total": 1,
+            }
+        if group_by_listing and listing_name == "Beta Farm":
+            return {
+                "items": [],
+                "grouped_items": [],
+                "page": 1,
+                "page_size": 100,
+                "total": 0,
+            }
+        return {"items": [], "page": page, "page_size": page_size, "total": 0}
+
+    updated = []
+
+    async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
+        updated.append((listing_id, tag_codes, reason_code, requested_by))
+        return {"ok": True}
+
+    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
+    monkeypatch.setattr(deps.platform_client, "list_canonical_tags", fake_list_canonical_tags)
+    monkeypatch.setattr(
+        deps.platform_client,
+        "list_listing_tag_assignments",
+        fake_list_listing_tag_assignments,
+    )
+    monkeypatch.setattr(
+        deps.platform_client,
+        "replace_listing_tag_assignments",
+        fake_replace_listing_tag_assignments,
+    )
+
+    response = client.post(
+        "/listing-tags/matrix",
+        data={
+            "listing_ids": ["listing-1", "listing-2"],
+            "original_tags__listing-1": "microgreens",
+            "original_tags__listing-2": "",
+            "selected_tags__listing-1": ["microgreens", "flowers"],
+            "selected_tags__listing-2": [],
+            "reason_code": "ADMIN_TAXONOMY_UPDATE",
+            "requested_by": "admin@smallfarms",
+            "page": "1",
+            "page_size": "25",
+            "listing_name": "",
+            "tag_name": "",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(updated) == 1
+    assert updated[0][0] == "listing-1"
+    assert updated[0][1] == ["flowers", "microgreens"]

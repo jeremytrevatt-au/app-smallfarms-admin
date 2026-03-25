@@ -49,147 +49,91 @@
 </section>
 
 <section class="card">
-  <h3>Listing Tag Editor</h3>
-  <p>Select a listing, then select or unselect tags to add/remove mappings in one update.</p>
-  {% if listing_options %}
-    <div class="button-row">
-      {% for option in listing_options %}
-        <a
-          class="btn {% if option.get('listing_id') == selected_listing_id %}btn-success{% endif %}"
-          href="/listing-tags?listing_name={{ listing_name }}&tag_name={{ tag_name }}&page={{ page }}&page_size={{ page_size }}&group_by_listing={{ 'true' if group_by_listing else 'false' }}&selected_listing_id={{ option.get('listing_id') }}"
-        >
-          {{ option.get('listing_name') }}
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p>No listings available in current assignment view. Adjust listing-name filter to load options.</p>
-  {% endif %}
-
-  {% if selected_listing_id %}
-    <form method="post" action="/listing-tags" class="action-form">
-      <input type="hidden" name="listing_id" value="{{ selected_listing_id }}">
-      <p><strong>Selected Listing:</strong> {{ selected_listing_name or selected_listing_id }}</p>
-      <label>Tags</label>
-      <div class="grid-3">
-        {% for tag in canonical_tags %}
-          <label style="display: flex; gap: 8px; align-items: center;">
-            <input
-              type="checkbox"
-              name="tag_codes"
-              value="{{ tag.get('tag_code') }}"
-              {% if tag.get('tag_code') in selected_listing_tag_codes %}checked{% endif %}
-            >
-            {{ tag.get('tag_name') }} ({{ tag.get('tag_code') }})
-          </label>
-        {% else %}
-          <p>No canonical tags available.</p>
-        {% endfor %}
+  <h3>Listing/Tag Matrix Editor</h3>
+  <p>Rows are listings and columns are tags. Toggle checkboxes and apply all changes in one batch.</p>
+  {% if listing_options and canonical_tags %}
+    <form method="post" action="/listing-tags/matrix" class="action-form">
+      <input type="hidden" name="listing_name" value="{{ listing_name }}">
+      <input type="hidden" name="tag_name" value="{{ tag_name }}">
+      <input type="hidden" name="page" value="{{ page }}">
+      <input type="hidden" name="page_size" value="{{ page_size }}">
+      <div style="overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.25rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Listing</th>
+              {% for tag in canonical_tags %}
+                <th>{{ tag.get("tag_name") }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for listing in listing_options %}
+              {% set listing_id = listing.get("listing_id") %}
+              {% set assigned_codes = assignment_matrix.get(listing_id, []) %}
+              <tr>
+                <td>
+                  <strong>{{ listing.get("listing_name") }}</strong><br>
+                  <small>{{ listing_id }}</small>
+                  <input type="hidden" name="listing_ids" value="{{ listing_id }}">
+                  <input type="hidden" name="original_tags__{{ listing_id }}" value="{{ assigned_codes | join(',') }}">
+                </td>
+                {% for tag in canonical_tags %}
+                  {% set code = tag.get("tag_code") %}
+                  <td style="text-align: center;">
+                    <input
+                      type="checkbox"
+                      name="selected_tags__{{ listing_id }}"
+                      value="{{ code }}"
+                      {% if code in assigned_codes %}checked{% endif %}
+                    >
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
       <label>Reason Code</label>
       <input name="reason_code" value="{{ reason_code or 'ADMIN_TAXONOMY_UPDATE' }}" required placeholder="ADMIN_TAXONOMY_UPDATE">
       <label>Requested By</label>
       <input name="requested_by" value="{{ requested_by }}" required placeholder="admin@smallfarms">
-      <button type="submit" class="btn">Apply Tag Selection</button>
+      <button type="submit" class="btn">Apply All Matrix Changes</button>
     </form>
+  {% elif not listing_options %}
+    <p>No listings available for the current listing filter.</p>
   {% else %}
-    <p>Select a listing above to load all tags with current assignments preselected.</p>
+    <p>No active tags available for the current tag filter.</p>
   {% endif %}
 </section>
 
-{% if group_by_listing %}
+{% if matrix_results %}
 <section class="card">
-  <h3>Grouped Assignments</h3>
-  {% for listing in grouped_items %}
-    <section class="card">
-      <h4>{{ listing.get("listing_name", "-") }}</h4>
-      <p>Listing ID: {{ listing.get("listing_id", "-") }}</p>
-      <p>Latest Assigned At: {{ listing.get("latest_assigned_at", "-") }}</p>
-      {% set tags = listing.get("tags", []) %}
-      {% if tags %}
-        <table>
-          <thead>
-            <tr>
-              <th>Tag Code</th>
-              <th>Tag Name</th>
-              <th>Assigned At</th>
-              <th>Assigned By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for tag in tags %}
-              <tr>
-                <td>{{ tag.get("tag_code", "-") }}</td>
-                <td>{{ tag.get("tag_name", "-") }}</td>
-                <td>{{ tag.get("assigned_at", "-") }}</td>
-                <td>{{ tag.get("assigned_by", "-") }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      {% else %}
-        <p>No tag assignments found for this listing.</p>
-      {% endif %}
-    </section>
-  {% else %}
-    <p>No listing tag assignments found.</p>
-  {% endfor %}
-</section>
-{% else %}
-<section class="card">
-  <h3>Assignment Rows</h3>
-  {% if items %}
-    <table>
-      <thead>
-        <tr>
-          <th>Listing Name</th>
-          <th>Listing ID</th>
-          <th>Tag Name</th>
-          <th>Tag Code</th>
-          <th>Assigned At</th>
-          <th>Assigned By</th>
-          <th>Active</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in items %}
-          <tr>
-            <td>{{ row.get("listing_name", "-") }}</td>
-            <td>{{ row.get("listing_id", "-") }}</td>
-            <td>{{ row.get("tag_name", "-") }}</td>
-            <td>{{ row.get("tag_code", "-") }}</td>
-            <td>{{ row.get("assigned_at", "-") }}</td>
-            <td>{{ row.get("assigned_by", "-") }}</td>
-            <td>{% if row.get("is_active_assignment") %}true{% else %}false{% endif %}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No listing tag assignments found.</p>
-  {% endif %}
-</section>
-{% endif %}
-
-<section class="card">
-  <h3>Replace Listing Tag Assignments</h3>
-  <form method="post" action="/listing-tags" class="action-form">
-    <label>Listing ID</label>
-    <input name="listing_id" value="{{ listing_id }}" required placeholder="listing-123">
-    <label>Tag Codes (comma separated)</label>
-    <input name="tag_codes_csv" value="{{ tag_codes_csv }}" placeholder="microgreens,flowers (leave blank to clear all)">
-    <label>Reason Code</label>
-    <input name="reason_code" value="{{ reason_code }}" required placeholder="ADMIN_TAXONOMY_UPDATE">
-    <label>Requested By</label>
-    <input name="requested_by" value="{{ requested_by }}" required placeholder="admin@smallfarms">
-    <button type="submit" class="btn">Replace Tag Assignments</button>
-  </form>
-</section>
-
-{% if result %}
-<section class="card">
-  <h3>Response</h3>
-  <pre>{{ result | tojson(indent=2) }}</pre>
+  <h3>Matrix Apply Results</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Listing ID</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in matrix_results %}
+      <tr>
+        <td>{{ item.get("listing_id", "-") }}</td>
+        <td>{{ item.get("status", "-") }}</td>
+        <td>
+          {% if item.get("status") == "updated" %}
+            {{ item.get("tag_codes", []) | join(", ") }}
+          {% else %}
+            {{ item.get("error", "-") }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 {% endif %}
 
