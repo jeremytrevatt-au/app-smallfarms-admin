@@ -290,3 +290,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Consider adding listing search pagination controls specific to selector options if assignment inventory grows beyond current first-page selector limit.
    2. Add UI diff preview (`will add`/`will remove`) before submission for higher-confidence bulk taxonomy edits.
+
+## Main push update (2026-03-25 08:14 UTC)
+
+1. TODOs completed since last push:
+   1. Updated listing selector data source in `/listing-tags` to use `GET /v1/admin/listings` so listings are selectable even when there are zero assignment rows.
+   2. Kept assignment preselection behavior by loading grouped assignment data for the selected listing name and matching by listing ID.
+   3. Added API log matching for `GET /v1/admin/listings` so listing-catalog diagnostics appear in the page-level request/response log panel.
+   4. Expanded tests for listing catalog integration, selected listing preselection flow, and updated filter forwarding expectations.
+2. Git build references:
+   1. `11a0c96`
+3. New understandings/learnings:
+   1. Listing catalog and assignment catalog are distinct concerns; sourcing selectors from assignment rows can hide valid listings when no assignments exist.
+   2. Selected-listing precheck remains reliable when combining listing catalog identity with grouped assignment projections for tag state lookup.
+4. Understood next steps (remaining TODOs):
+   1. Add explicit empty-state helper text when selected listing has no existing assignment rows to confirm that unselected tags represent clear-state rather than load failure.
+   2. Add diff preview (`will add`/`will remove`) in the listing editor prior to submission for safer high-impact taxonomy edits.
