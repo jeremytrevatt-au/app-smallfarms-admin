@@ -306,3 +306,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Add explicit empty-state helper text when selected listing has no existing assignment rows to confirm that unselected tags represent clear-state rather than load failure.
    2. Add diff preview (`will add`/`will remove`) in the listing editor prior to submission for safer high-impact taxonomy edits.
+
+## Main push update (2026-03-25 20:36 UTC)
+
+1. TODOs completed since last push:
+   1. Replaced listing-click tag editing flow with a matrix editor on `/listing-tags` where rows are listings and columns are tags.
+   2. Added batch matrix apply endpoint that submits all edited listing rows in one action and only writes changed rows.
+   3. Preserved API diagnostics while adding matrix apply result visibility for per-listing success/failure outcomes.
+   4. Expanded listing-tag regression tests for matrix rendering and changed-row-only batch update behavior.
+2. Git build references:
+   1. `ba7dc03`
+3. New understandings/learnings:
+   1. The matrix model significantly reduces repetitive navigation overhead when operators need to update multiple listings in one taxonomy pass.
+   2. Comparing posted checkbox state against original row state avoids unnecessary replacement writes and limits accidental no-op churn.
+4. Understood next steps (remaining TODOs):
+   1. Add optional horizontal sticky headers/first-column behavior if matrix width increases with larger canonical tag catalogs.
+   2. Evaluate backend support for a direct listing-id scoped assignment-read endpoint to reduce per-row grouped lookup calls in very large pages.
