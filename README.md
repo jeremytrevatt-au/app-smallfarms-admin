@@ -274,3 +274,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Consider adding a clear button/scope toggle for listing-tag diagnostics if log volume grows during active investigations.
    2. Optionally mirror the same inline diagnostics pattern to other admin pages that depend on newly evolving backend contracts.
+
+## Main push update (2026-03-25 07:53 UTC)
+
+1. TODOs completed since last push:
+   1. Added a listing-first tag editor on `/listing-tags` where operators click a listing and edit tag assignments via checkboxes.
+   2. Loaded canonical tag catalog for editor rendering and preselected currently assigned tags for the selected listing.
+   3. Enabled add/remove behavior in a single update by accepting checkbox-based tag selections (including unselect-to-remove and empty selection for clear-all).
+   4. Added regression coverage for canonical tag loading, filter forwarding with selector calls, and checkbox-based assignment updates.
+2. Git build references:
+   1. `e91e2b4`
+3. New understandings/learnings:
+   1. Listing-first selection with prechecked tags provides a clearer mental model for both adding and removing tags than CSV entry flows.
+   2. Read-path selector data and write-path assignment updates can share the same endpoint contract while still supporting operator-friendly editing interactions.
+4. Understood next steps (remaining TODOs):
+   1. Consider adding listing search pagination controls specific to selector options if assignment inventory grows beyond current first-page selector limit.
+   2. Add UI diff preview (`will add`/`will remove`) before submission for higher-confidence bulk taxonomy edits.
