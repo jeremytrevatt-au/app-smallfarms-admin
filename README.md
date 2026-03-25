@@ -322,3 +322,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Add optional horizontal sticky headers/first-column behavior if matrix width increases with larger canonical tag catalogs.
    2. Evaluate backend support for a direct listing-id scoped assignment-read endpoint to reduce per-row grouped lookup calls in very large pages.
+
+## Main push update (2026-03-25 21:46 UTC)
+
+1. TODOs completed since last push:
+   1. Converted `listings/manage` to a row-based editable grid with filters, pagination, and one batch apply action.
+   2. Converted `tags` governance to a row-based editable grid with filter support and add-row behavior for bulk canonical tag updates.
+   3. Integrated `/listing-tags` matrix editor with backend `GET /v1/admin/listing-tag-matrix` and `POST /v1/admin/listing-tag-matrix/apply` endpoints as source-of-truth read and bulk write paths.
+   4. Updated route/client tests to cover new grid flows and matrix bulk apply payload/response handling.
+2. Git build references:
+   1. `926e74f`
+3. New understandings/learnings:
+   1. Matrix and grid UIs remain stable when backend returns UI-ready source-of-truth shapes, eliminating fragile client-side joins across separate catalogs.
+   2. Bulk update endpoints with per-row status reporting simplify operator workflows while preserving clear failure visibility for partial-success outcomes.
+4. Understood next steps (remaining TODOs):
+   1. Add incremental UX enhancements for wide grids (for example sticky first column/header) if operator usage expands to larger tag catalogs.
+   2. Monitor matrix apply response patterns in production logs to tune operator-facing status summaries and failure guidance text.
