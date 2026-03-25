@@ -242,3 +242,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Add kill-switch admin controls only when backend exposes/requests corresponding admin UX entry points for activate/deactivate operations.
    2. Re-check webhook transport assumptions if Stripe webhook tooling is introduced into this repository.
+
+## Main push update (2026-03-25 07:05 UTC)
+
+1. TODOs completed since last push:
+   1. Added listing-tag assignment read integration for `GET /v1/admin/listing-tag-assignments` with pagination and total-count handling.
+   2. Added Admin filters for listing name and tag name (case-insensitive contains semantics aligned to backend behavior).
+   3. Added grouped projection support (`group_by_listing=true`) with grouped listing/tag rendering while preserving default row-view behavior.
+   4. Added regression tests for row rendering, filter forwarding, grouped mode rendering, and 503 availability handling on listing-tag assignment reads.
+2. Git build references:
+   1. `b3b6a85`
+3. New understandings/learnings:
+   1. Row-view and grouped-view projections can share the same filter/pagination contract while improving operator readability for listing-centric tag audits.
+   2. Name-based filtering in Admin significantly reduces operational friction compared with ID/code-only assignment lookups.
+4. Understood next steps (remaining TODOs):
+   1. Consider adding direct “open listing management” shortcuts from assignment rows/groups for faster triage workflows.
+   2. Monitor grouped projection payload size at higher page sizes and tune default page size if rendering performance drops.
