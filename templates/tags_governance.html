@@ -9,12 +9,70 @@
 </section>
 
 <section class="card">
+  <h3>Tag Grid Filters</h3>
+  <form method="get" action="/tags" class="grid-3">
+    <div>
+      <label>Tag name or code</label>
+      <input name="tag_name" value="{{ tag_name }}" placeholder="contains match">
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button type="submit" class="btn">Apply Filters</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h3>Canonical Tag Grid</h3>
   <form method="post" action="/tags" class="action-form">
+    <input type="hidden" name="tag_name" value="{{ tag_name }}">
+    <div style="overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.25rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Tag Code</th>
+            <th>Tag Label</th>
+            <th>Active</th>
+          </tr>
+        </thead>
+        <tbody id="tag-grid-body">
+          {% for tag in tag_rows %}
+          <tr>
+            <td>
+              <input type="hidden" name="row_ids" value="{{ loop.index0 }}">
+              <input name="tag_code__{{ loop.index0 }}" value="{{ tag.get('tag_code', '') }}" required>
+            </td>
+            <td>
+              <input name="tag_label__{{ loop.index0 }}" value="{{ tag.get('tag_label', '') }}">
+            </td>
+            <td style="text-align: center;">
+              <input
+                type="checkbox"
+                name="is_active__{{ loop.index0 }}"
+                value="true"
+                {% if tag.get('is_active') %}checked{% endif %}
+              >
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3">No tags loaded for current filter. Add rows below and apply changes.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="button-row">
+      <button type="button" class="btn btn-secondary" id="add-tag-row-btn">Add Tag Row</button>
+    </div>
     <label>Requested By</label>
     <input name="requested_by" value="{{ requested_by }}" required placeholder="admin@smallfarms">
-    <label>Tags JSON Array</label>
-    <textarea name="tags_json" rows="12">{{ tags_json }}</textarea>
-    <button type="submit" class="btn">Upsert Canonical Tags</button>
+    <button type="submit" class="btn">Apply Tag Grid Changes</button>
+    <details>
+      <summary>Advanced JSON payload view</summary>
+      <label>Tags JSON Array (fallback/manual)</label>
+      <textarea name="tags_json" rows="12">{{ tags_json }}</textarea>
+    </details>
   </form>
 </section>
 
@@ -24,4 +82,25 @@
   <pre>{{ result | tojson(indent=2) }}</pre>
 </section>
 {% endif %}
+
+<script>
+  (function () {
+    const body = document.getElementById("tag-grid-body");
+    const addBtn = document.getElementById("add-tag-row-btn");
+    if (!body || !addBtn) {
+      return;
+    }
+    let dynamicIndex = {{ tag_rows | length }};
+    addBtn.addEventListener("click", function () {
+      const row = document.createElement("tr");
+      row.innerHTML =
+        '<td><input type="hidden" name="row_ids" value="' + dynamicIndex + '"><input name="tag_code__' +
+        dynamicIndex + '" value="" required></td>' +
+        '<td><input name="tag_label__' + dynamicIndex + '" value=""></td>' +
+        '<td style="text-align: center;"><input type="checkbox" name="is_active__' + dynamicIndex + '" value="true" checked></td>';
+      body.appendChild(row);
+      dynamicIndex += 1;
+    });
+  })();
+</script>
 {% endblock %}

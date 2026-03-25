@@ -1,5 +1,3 @@
-import asyncio
-
 from fastapi import APIRouter, Form, Request
 
 from app.deps import platform_client, templates
@@ -144,6 +142,7 @@ def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
         path = str(entry.get("path", ""))
         if (
             "/v1/admin/listing-tag-assignments" in path
+            or "/v1/admin/listing-tag-matrix" in path
             or "/v1/admin/listings" in path
             or "/v1/admin/listings/" in path
             and "/tag-assignments" in path
@@ -154,27 +153,59 @@ def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
     return matched
 
 
-def _normalize_listing_options(response: dict) -> list[dict]:
-    raw = response.get("items", [])
-    if not isinstance(raw, list):
-        return []
-    options: list[dict] = []
-    for entry in raw:
+def _normalize_matrix_payload(response: dict) -> tuple[list[dict], list[dict], dict[str, list[str]]]:
+    raw_tags = response.get("tags", [])
+    raw_items = response.get("items", [])
+    if not isinstance(raw_tags, list):
+        raw_tags = []
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    canonical_tags: list[dict] = []
+    for entry in raw_tags:
+        if not isinstance(entry, dict):
+            continue
+        tag_code = str(entry.get("tag_code") or "").strip()
+        if not tag_code:
+            continue
+        tag_name = str(
+            entry.get("tag_name") or entry.get("tag_label") or entry.get("label") or tag_code
+        ).strip() or tag_code
+        canonical_tags.append(
+            {
+                "tag_code": tag_code,
+                "tag_name": tag_name,
+                "is_active": bool(entry.get("is_active", True)),
+            }
+        )
+    canonical_tags.sort(key=lambda item: item["tag_name"].lower())
+
+    listing_options: list[dict] = []
+    assignment_matrix: dict[str, list[str]] = {}
+    for entry in raw_items:
         if not isinstance(entry, dict):
             continue
         listing_id = str(entry.get("listing_id") or "").strip()
         if not listing_id:
             continue
-        listing_name = str(entry.get("listing_name") or listing_id).strip() or listing_id
-        options.append(
+        listing_name = str(
+            entry.get("display_name") or entry.get("listing_name") or listing_id
+        ).strip() or listing_id
+        listing_options.append(
             {
                 "listing_id": listing_id,
                 "listing_name": listing_name,
-                "latest_assigned_at": "",
-                "selected_tag_codes": [],
             }
         )
-    return options
+        assigned_tag_codes_raw = entry.get("assigned_tag_codes", [])
+        assigned_tag_codes: list[str] = []
+        if isinstance(assigned_tag_codes_raw, list):
+            for code in assigned_tag_codes_raw:
+                code_text = str(code).strip()
+                if code_text:
+                    assigned_tag_codes.append(code_text)
+        assignment_matrix[listing_id] = sorted(list(set(assigned_tag_codes)))
+    return listing_options, canonical_tags, assignment_matrix
 
 
 def _split_codes_csv(value: str) -> list[str]:
@@ -194,50 +225,6 @@ def _filter_tags_for_matrix(canonical_tags: list[dict], tag_name: str) -> list[d
             or needle in str(tag.get("tag_code", "")).lower()
         )
     ]
-
-
-async def _load_assignment_matrix_for_listings(listing_options: list[dict]) -> dict[str, list[str]]:
-    async def _fetch_for_listing(option: dict) -> tuple[str, list[str]]:
-        listing_id = option.get("listing_id", "")
-        listing_name = option.get("listing_name", "")
-        if not listing_id or not listing_name:
-            return "", []
-        response = await platform_client.list_listing_tag_assignments(
-            listing_name=str(listing_name),
-            tag_name="",
-            page=1,
-            page_size=200,
-            group_by_listing=True,
-        )
-        grouped = response.get("grouped_items", [])
-        selected_codes: list[str] = []
-        if isinstance(grouped, list):
-            for entry in grouped:
-                if not isinstance(entry, dict):
-                    continue
-                if str(entry.get("listing_id") or "") != str(listing_id):
-                    continue
-                tags = entry.get("tags", [])
-                if isinstance(tags, list):
-                    for tag in tags:
-                        if not isinstance(tag, dict):
-                            continue
-                        code = str(tag.get("tag_code") or "").strip()
-                        if code:
-                            selected_codes.append(code)
-                break
-        return str(listing_id), sorted(list(set(selected_codes)))
-
-    tasks = [_fetch_for_listing(option) for option in listing_options]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    matrix: dict[str, list[str]] = {}
-    for result in results:
-        if isinstance(result, Exception):
-            continue
-        listing_id, codes = result
-        if listing_id:
-            matrix[listing_id] = codes
-    return matrix
 
 
 @router.get("/listing-tags", include_in_schema=False)
@@ -263,19 +250,13 @@ async def listing_tags_page(request: Request):
     message = ""
     level = "success"
     try:
-        response = await platform_client.list_listing_tag_assignments(
+        response = await platform_client.list_listing_tag_matrix(
             listing_name=listing_name,
             tag_name=tag_name,
             page=page,
             page_size=page_size,
-            group_by_listing=group_by_listing,
         )
-        raw_items = response.get("items", [])
-        if isinstance(raw_items, list):
-            items = [entry for entry in raw_items if isinstance(entry, dict)]
-        raw_grouped = response.get("grouped_items", [])
-        if isinstance(raw_grouped, list):
-            grouped_items = [entry for entry in raw_grouped if isinstance(entry, dict)]
+        listing_options, canonical_tags, assignment_matrix = _normalize_matrix_payload(response)
         response_page = _parse_int(str(response.get("page")), page, 1)
         response_page_size = _parse_int(
             str(response.get("page_size")),
@@ -283,44 +264,16 @@ async def listing_tags_page(request: Request):
             1,
             MAX_PAGE_SIZE,
         )
-        total = _parse_int(str(response.get("total")), len(items), 0)
+        total = _parse_int(str(response.get("total")), len(listing_options), 0)
+        items = list(listing_options)
     except PlatformApiError as exc:
         message = (
-            "database_unavailable: listing tag assignment service unavailable."
+            "database_unavailable: listing tag matrix service unavailable."
             if exc.status_code == 503
-            else f"Failed to load listing tag assignments: {exc.message}"
+            else f"Failed to load listing tag matrix: {exc.message}"
         )
         level = "error"
 
-    try:
-        listing_selector_response = await platform_client.list_admin_listings(
-            listing_name=listing_name,
-            page=1,
-            page_size=100,
-        )
-        listing_options = _normalize_listing_options(listing_selector_response)
-    except PlatformApiError as exc:
-        if not message:
-            message = (
-                "database_unavailable: listing selector unavailable."
-                if exc.status_code == 503
-                else f"Failed to load listing selector options: {exc.message}"
-            )
-            level = "error"
-
-    try:
-        canonical_tags = _normalize_canonical_tags(await platform_client.list_canonical_tags())
-    except PlatformApiError as exc:
-        if not message:
-            message = _tag_catalog_error_message(exc)
-            level = "error"
-
-    try:
-        assignment_matrix = await _load_assignment_matrix_for_listings(listing_options)
-    except PlatformApiError as exc:
-        if not message:
-            message = f"Failed to load assignment matrix: {exc.message}"
-            level = "error"
     if selected_listing_id and listing_options:
         for option in listing_options:
             if option["listing_id"] == selected_listing_id:
@@ -383,8 +336,7 @@ async def apply_listing_tags_matrix(
             api_log_items=_listing_tag_api_logs(),
         )
 
-    results: list[dict] = []
-    changed_count = 0
+    updates: list[dict] = []
     for listing_id in listing_ids:
         original_codes = set(_split_codes_csv(str(form.get(f"original_tags__{listing_id}") or "")))
         selected_codes = sorted(
@@ -399,30 +351,38 @@ async def apply_listing_tags_matrix(
         selected_set = set(selected_codes)
         if selected_set == original_codes:
             continue
-        changed_count += 1
-        try:
-            await platform_client.replace_listing_tag_assignments(
-                listing_id=listing_id,
-                tag_codes=selected_codes,
-                reason_code=reason_code.strip(),
-                requested_by=requested_by.strip(),
-            )
-            results.append({"listing_id": listing_id, "status": "updated", "tag_codes": selected_codes})
-        except PlatformApiError as exc:
-            results.append(
-                {
-                    "listing_id": listing_id,
-                    "status": "failed",
-                    "error": exc.message,
-                    "error_code": exc.error_code,
-                }
-            )
+        updates.append(
+            {
+                "listing_id": listing_id,
+                "tag_codes": selected_codes,
+            }
+        )
 
+    results: list[dict] = []
+    changed_count = len(updates)
     message = f"Matrix apply processed {changed_count} changed listing row(s)."
     level = "success"
-    if any(item.get("status") == "failed" for item in results):
-        message = f"Matrix apply completed with failures. Changed rows: {changed_count}."
-        level = "error"
+    if updates:
+        try:
+            apply_response = await platform_client.apply_listing_tag_matrix_updates(
+                requested_by=requested_by.strip(),
+                reason_code=reason_code.strip(),
+                updates=updates,
+            )
+            raw_results = apply_response.get("results", [])
+            if isinstance(raw_results, list):
+                results = [entry for entry in raw_results if isinstance(entry, dict)]
+            failure_count = _parse_int(str(apply_response.get("failure_count")), 0, 0)
+            success_count = _parse_int(str(apply_response.get("success_count")), 0, 0)
+            message = (
+                f"Matrix apply completed. Changed rows: {changed_count}. "
+                f"Success: {success_count}. Failed: {failure_count}."
+            )
+            if failure_count > 0:
+                level = "error"
+        except PlatformApiError as exc:
+            message = _assignment_error_message(exc)
+            level = "error"
 
     # Reuse GET loader by calling into same data loading logic.
     listing_name = listing_name.strip()
@@ -440,42 +400,20 @@ async def apply_listing_tags_matrix(
     total = 0
     total_pages = 1
     try:
-        response = await platform_client.list_listing_tag_assignments(
+        response = await platform_client.list_listing_tag_matrix(
             listing_name=listing_name,
             tag_name=tag_name,
             page=page_num,
             page_size=page_size_num,
-            group_by_listing=group_by_listing,
         )
-        raw_items = response.get("items", [])
-        if isinstance(raw_items, list):
-            items = [entry for entry in raw_items if isinstance(entry, dict)]
-        raw_grouped = response.get("grouped_items", [])
-        if isinstance(raw_grouped, list):
-            grouped_items = [entry for entry in raw_grouped if isinstance(entry, dict)]
-        total = _parse_int(str(response.get("total")), len(items), 0)
+        listing_options, canonical_tags, assignment_matrix = _normalize_matrix_payload(response)
+        items = list(listing_options)
+        total = _parse_int(str(response.get("total")), len(listing_options), 0)
         resp_page_size = _parse_int(str(response.get("page_size")), page_size_num, 1, MAX_PAGE_SIZE)
         total_pages = max(1, (total + resp_page_size - 1) // resp_page_size)
     except PlatformApiError as exc:
         message = f"{message} Refresh failed: {exc.message}"
         level = "error"
-    try:
-        listing_selector_response = await platform_client.list_admin_listings(
-            listing_name=listing_name,
-            page=1,
-            page_size=100,
-        )
-        listing_options = _normalize_listing_options(listing_selector_response)
-    except PlatformApiError:
-        pass
-    try:
-        canonical_tags = _normalize_canonical_tags(await platform_client.list_canonical_tags())
-    except PlatformApiError:
-        pass
-    try:
-        assignment_matrix = await _load_assignment_matrix_for_listings(listing_options)
-    except PlatformApiError:
-        pass
 
     return _render_listing_tags(
         request,

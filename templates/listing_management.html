@@ -2,44 +2,137 @@
 {% block content %}
 <section class="card">
   <h2>Listing Lifecycle Management</h2>
-  <p>Use PATCH and DELETE admin listing endpoints for controlled lifecycle operations.</p>
+  <p>Use the listing grid to edit display/status fields by row and apply all changes in one action.</p>
   {% if message %}
     <div class="alert {{ level }}">{{ message }}</div>
   {% endif %}
 </section>
 
 <section class="card">
-  <h3>Patch Listing Metadata</h3>
-  <p>Tags are canonical taxonomy. Category/Farm Type are derived from tag assignments and not editable here.</p>
-  <p><code>pretty_name</code> is premium/member-flow managed and is not writable through admin listing patch routes.</p>
-  <form method="post" action="/listings/manage/update" class="action-form">
-    <label>Listing ID</label>
-    <input name="listing_id" value="{{ update_listing_id }}" required placeholder="listing-123">
-    <label>Requested By</label>
-    <input name="requested_by" value="{{ update_requested_by }}" required placeholder="admin@smallfarms.com.au">
-    <label>Reason Code</label>
-    <input name="reason_code" value="{{ update_reason_code }}" required placeholder="ADMIN_LISTING_UPDATE">
-    <label>Display Name (optional mutable field)</label>
-    <input name="display_name" value="{{ update_display_name }}" placeholder="Example Farm">
-    <label>Status Code (optional mutable field)</label>
-    <input name="status_code" value="{{ update_status_code }}" placeholder="active">
-    <button type="submit" class="btn">Patch Listing</button>
+  <h3>Listing Grid Filters</h3>
+  <form method="get" action="/listings/manage" class="grid-3">
+    <div>
+      <label>Listing Name</label>
+      <input name="listing_name" value="{{ listing_name }}" placeholder="contains match">
+    </div>
+    <div>
+      <label>Page Size</label>
+      <input type="number" name="page_size" min="1" max="100" value="{{ page_size }}">
+    </div>
+    <div>
+      <label>Delete toggle</label>
+      <select name="matrix_delete_enabled">
+        <option value="true" {% if matrix_delete_enabled %}selected{% endif %}>Enabled in grid</option>
+        <option value="false" {% if not matrix_delete_enabled %}selected{% endif %}>Disabled in grid</option>
+      </select>
+    </div>
+    <div>
+      <input type="hidden" name="page" value="1">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn">Apply Filters</button>
+    </div>
   </form>
-  <p>To update taxonomy, use the Listing Tags page and tag assignment endpoint.</p>
+  <p>Page {{ page }} of {{ total_pages }} | Total listings: {{ total }}</p>
+  <div class="button-row">
+    {% if has_prev_page %}
+      <a class="btn" href="/listings/manage?listing_name={{ listing_name }}&page={{ prev_page }}&page_size={{ page_size }}&matrix_delete_enabled={{ 'true' if matrix_delete_enabled else 'false' }}">Previous</a>
+    {% endif %}
+    {% if has_next_page %}
+      <a class="btn" href="/listings/manage?listing_name={{ listing_name }}&page={{ next_page }}&page_size={{ page_size }}&matrix_delete_enabled={{ 'true' if matrix_delete_enabled else 'false' }}">Next</a>
+    {% endif %}
+  </div>
 </section>
 
 <section class="card">
-  <h3>Delete Listing (Soft-Delete)</h3>
-  <form method="post" action="/listings/manage/delete" class="action-form">
-    <label>Listing ID</label>
-    <input name="listing_id" value="{{ delete_listing_id }}" required placeholder="listing-123">
+  <h3>Listing Row Grid</h3>
+  <p>Tags are canonical taxonomy. Category/Farm Type are derived from tag assignments and not editable here.</p>
+  <p><code>pretty_name</code> is premium/member-flow managed and is not writable through admin listing patch routes.</p>
+  {% if listing_rows %}
+  <form method="post" action="/listings/manage/matrix" class="action-form">
+    <input type="hidden" name="listing_name" value="{{ listing_name }}">
+    <input type="hidden" name="page" value="{{ page }}">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <input type="hidden" name="matrix_delete_enabled" value="{{ 'true' if matrix_delete_enabled else 'false' }}">
+    <div style="overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.25rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Listing ID</th>
+            <th>Display Name</th>
+            <th>Status Code</th>
+            {% if matrix_delete_enabled %}
+              <th>Delete</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in listing_rows %}
+            {% set listing_id = row.get("listing_id") %}
+            <tr>
+              <td>
+                {{ listing_id }}
+                <input type="hidden" name="listing_ids" value="{{ listing_id }}">
+                <input type="hidden" name="original_display_name__{{ listing_id }}" value="{{ row.get('listing_name', '') }}">
+                <input type="hidden" name="original_status_code__{{ listing_id }}" value="{{ row.get('status_code', '') }}">
+              </td>
+              <td>
+                <input name="display_name__{{ listing_id }}" value="{{ row.get('listing_name', '') }}" placeholder="Display name">
+              </td>
+              <td>
+                <input name="status_code__{{ listing_id }}" value="{{ row.get('status_code', '') }}" placeholder="active">
+              </td>
+              {% if matrix_delete_enabled %}
+                <td style="text-align: center;">
+                  <input type="checkbox" name="delete__{{ listing_id }}" value="true">
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     <label>Requested By</label>
-    <input name="requested_by" value="{{ delete_requested_by }}" required placeholder="admin@smallfarms.com.au">
+    <input name="matrix_requested_by" value="{{ matrix_requested_by or update_requested_by }}" required placeholder="admin@smallfarms.com.au">
     <label>Reason Code</label>
-    <input name="reason_code" value="{{ delete_reason_code }}" required placeholder="ADMIN_LISTING_DELETE">
-    <button type="submit" class="btn btn-warning">Delete Listing</button>
+    <input name="matrix_reason_code" value="{{ matrix_reason_code or update_reason_code or 'ADMIN_LISTING_UPDATE' }}" required placeholder="ADMIN_LISTING_UPDATE">
+    <button type="submit" class="btn">Apply Grid Changes</button>
   </form>
+  {% else %}
+    <p>No listings found for current filters.</p>
+  {% endif %}
 </section>
+
+{% if matrix_results %}
+<section class="card">
+  <h3>Grid Apply Results</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Listing ID</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in matrix_results %}
+      <tr>
+        <td>{{ item.get("listing_id", "-") }}</td>
+        <td>{{ item.get("status", "-") }}</td>
+        <td>
+          {% if item.get("status") == "updated" %}
+            display_name={{ item.get("display_name", "-") }}, status_code={{ item.get("status_code", "-") }}
+          {% elif item.get("status") == "deleted" %}
+            soft-delete requested
+          {% else %}
+            {{ item.get("error", "-") }}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 
 {% if result %}
 <section class="card">

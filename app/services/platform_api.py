@@ -387,6 +387,46 @@ class PlatformApiClient:
             query_params=query_params,
         )
 
+    async def list_listing_tag_matrix(
+        self,
+        listing_name: str = "",
+        tag_name: str = "",
+        page: int = 1,
+        page_size: int = 25,
+        include_inactive_tags: bool = False,
+    ) -> dict[str, Any]:
+        query_params: dict[str, Any] = {
+            "page": page,
+            "page_size": page_size,
+        }
+        if listing_name.strip():
+            query_params["listing_name"] = listing_name.strip()
+        if tag_name.strip():
+            query_params["tag_name"] = tag_name.strip()
+        if include_inactive_tags:
+            query_params["include_inactive_tags"] = "true"
+        return await self._request(
+            "GET",
+            "/v1/admin/listing-tag-matrix",
+            query_params=query_params,
+        )
+
+    async def apply_listing_tag_matrix_updates(
+        self,
+        requested_by: str,
+        reason_code: str,
+        updates: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/v1/admin/listing-tag-matrix/apply",
+            {
+                "requested_by": requested_by.strip(),
+                "reason_code": reason_code.strip(),
+                "updates": updates,
+            },
+        )
+
     async def patch_admin_listing(
         self,
         listing_id: str,

@@ -9,74 +9,42 @@ from app.services.platform_api import PlatformApiError
 client = TestClient(app)
 
 
-def _mock_canonical_tags(monkeypatch):
-    async def fake_list_canonical_tags():
+def _mock_listing_tag_matrix(monkeypatch):
+    async def fake_list_listing_tag_matrix(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        include_inactive_tags=False,
+    ):
+        assert include_inactive_tags is False
         return {
-            "items": [
+            "tags": [
                 {"tag_code": "microgreens", "tag_name": "Microgreens", "is_active": True},
                 {"tag_code": "flowers", "tag_name": "Flowers", "is_active": True},
-            ]
-        }
-
-    monkeypatch.setattr(deps.platform_client, "list_canonical_tags", fake_list_canonical_tags)
-
-
-def _mock_listing_catalog(monkeypatch):
-    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
-        return {
+            ],
             "items": [
-                {"listing_id": "listing-1", "listing_name": "Example Farm"},
-                {"listing_id": "listing-2", "listing_name": "Beta Farm"},
+                {
+                    "listing_id": "listing-1",
+                    "display_name": "Example Farm",
+                    "assigned_tag_codes": ["microgreens"],
+                },
+                {
+                    "listing_id": "listing-2",
+                    "display_name": "Beta Farm",
+                    "assigned_tag_codes": [],
+                },
             ],
             "page": page,
             "page_size": page_size,
             "total": 2,
         }
 
-    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
+    monkeypatch.setattr(deps.platform_client, "list_listing_tag_matrix", fake_list_listing_tag_matrix)
 
 
 def test_listing_tags_page_loads(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
-
-    async def fake_list_listing_tag_assignments(
-        listing_name="",
-        tag_name="",
-        page=1,
-        page_size=25,
-        group_by_listing=False,
-    ):
-        assert listing_name == ""
-        assert tag_name == ""
-        assert page == 1
-        if group_by_listing:
-            assert page_size == 100
-            return {"grouped_items": [], "page": 1, "page_size": 100, "total": 0}
-        assert page_size == 25
-        assert group_by_listing is False
-        return {
-            "items": [
-                {
-                    "listing_id": "listing-1",
-                    "listing_name": "Example Farm",
-                    "tag_code": "microgreens",
-                    "tag_name": "Microgreens",
-                    "assigned_at": "2026-03-25T04:01:00Z",
-                    "assigned_by": "admin@smallfarms.com.au",
-                    "is_active_assignment": True,
-                }
-            ],
-            "page": 1,
-            "page_size": 25,
-            "total": 1,
-        }
-
-    monkeypatch.setattr(
-        deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
-    )
+    _mock_listing_tag_matrix(monkeypatch)
     response = client.get("/listing-tags")
     assert response.status_code == 200
     assert "Listing Tag Assignments" in response.text
@@ -86,40 +54,32 @@ def test_listing_tags_page_loads(monkeypatch):
 
 
 def test_listing_tags_filters_forwarded(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    seen_catalog = {}
+    seen = {}
     calls = []
 
-    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
-        seen_catalog["listing_name"] = listing_name
-        seen_catalog["page"] = page
-        seen_catalog["page_size"] = page_size
-        return {"items": [], "page": page, "page_size": page_size, "total": 0}
-
-    async def fake_list_listing_tag_assignments(
+    async def fake_list_listing_tag_matrix(
         listing_name="",
         tag_name="",
         page=1,
         page_size=25,
-        group_by_listing=False,
+        include_inactive_tags=False,
     ):
+        seen["include_inactive_tags"] = include_inactive_tags
         calls.append(
             {
                 "listing_name": listing_name,
                 "tag_name": tag_name,
                 "page": page,
                 "page_size": page_size,
-                "group_by_listing": group_by_listing,
             }
         )
-        return {"items": [], "page": page, "page_size": page_size, "total": 0}
+        return {"tags": [], "items": [], "page": page, "page_size": page_size, "total": 0}
 
     monkeypatch.setattr(
         deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
+        "list_listing_tag_matrix",
+        fake_list_listing_tag_matrix,
     )
-    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
     response = client.get(
         "/listing-tags?listing_name=Example&tag_name=Micro&page=2&page_size=10&group_by_listing=false"
     )
@@ -128,51 +88,11 @@ def test_listing_tags_filters_forwarded(monkeypatch):
     assert calls[0]["tag_name"] == "Micro"
     assert calls[0]["page"] == 2
     assert calls[0]["page_size"] == 10
-    assert calls[0]["group_by_listing"] is False
-    assert seen_catalog["listing_name"] == "Example"
-    assert seen_catalog["page"] == 1
-    assert seen_catalog["page_size"] == 100
+    assert seen["include_inactive_tags"] is False
 
 
 def test_listing_tags_grouped_view(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
-
-    async def fake_list_listing_tag_assignments(
-        listing_name="",
-        tag_name="",
-        page=1,
-        page_size=25,
-        group_by_listing=False,
-    ):
-        assert group_by_listing is True
-        return {
-            "items": [],
-            "grouped_items": [
-                {
-                    "listing_id": "listing-1",
-                    "listing_name": "Example Farm",
-                    "latest_assigned_at": "2026-03-25T04:30:00Z",
-                    "tags": [
-                        {
-                            "tag_code": "microgreens",
-                            "tag_name": "Microgreens",
-                            "assigned_at": "2026-03-25T04:01:00Z",
-                            "assigned_by": "admin@smallfarms.com.au",
-                        }
-                    ],
-                }
-            ],
-            "page": 1,
-            "page_size": 25,
-            "total": 1,
-        }
-
-    monkeypatch.setattr(
-        deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
-    )
+    _mock_listing_tag_matrix(monkeypatch)
     response = client.get("/listing-tags?group_by_listing=true")
     assert response.status_code == 200
     assert "Listing/Tag Matrix Editor" in response.text
@@ -180,52 +100,33 @@ def test_listing_tags_grouped_view(monkeypatch):
 
 
 def test_listing_tags_load_error_503(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
-
-    async def fake_list_listing_tag_assignments(
+    async def fake_list_listing_tag_matrix(
         listing_name="",
         tag_name="",
         page=1,
         page_size=25,
-        group_by_listing=False,
+        include_inactive_tags=False,
     ):
         raise PlatformApiError(503, "database_unavailable", "database_unavailable")
 
     monkeypatch.setattr(
         deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
+        "list_listing_tag_matrix",
+        fake_list_listing_tag_matrix,
     )
     response = client.get("/listing-tags")
     assert response.status_code == 200
-    assert "database_unavailable: listing tag assignment service unavailable." in response.text
+    assert "database_unavailable: listing tag matrix service unavailable." in response.text
 
 
 def test_listing_tags_page_shows_related_api_logs(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
-
-    async def fake_list_listing_tag_assignments(
-        listing_name="",
-        tag_name="",
-        page=1,
-        page_size=25,
-        group_by_listing=False,
-    ):
-        return {"items": [], "page": 1, "page_size": 25, "total": 0}
-
-    monkeypatch.setattr(
-        deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
-    )
+    _mock_listing_tag_matrix(monkeypatch)
     api_log_store.add(
         {
             "started_at_utc": "2026-03-25T07:10:00+00:00",
             "finished_at_utc": "2026-03-25T07:10:00+00:00",
             "method": "GET",
-            "path": "/v1/admin/listing-tag-assignments",
+            "path": "/v1/admin/listing-tag-matrix",
             "request_body": {},
             "request_query": {"listing_name": "example"},
             "status_code": 404,
@@ -236,13 +137,11 @@ def test_listing_tags_page_shows_related_api_logs(monkeypatch):
     response = client.get("/listing-tags")
     assert response.status_code == 200
     assert "API Request/Response Log" in response.text
-    assert "/v1/admin/listing-tag-assignments" in response.text
+    assert "/v1/admin/listing-tag-matrix" in response.text
     assert "Not Found" in response.text
 
 
 def test_replace_listing_tags_success(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["microgreens", "flowers"]
@@ -269,8 +168,6 @@ def test_replace_listing_tags_success(monkeypatch):
 
 
 def test_replace_listing_tags_unknown_code(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["unknown_tag"]
@@ -297,8 +194,6 @@ def test_replace_listing_tags_unknown_code(monkeypatch):
 
 
 def test_replace_listing_tags_from_checkboxes(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
     async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
         assert listing_id == "listing-1"
         assert tag_codes == ["microgreens", "flowers"]
@@ -325,125 +220,73 @@ def test_replace_listing_tags_from_checkboxes(monkeypatch):
 
 
 def test_listing_tags_editor_preselects_existing_assignment(monkeypatch):
-    _mock_canonical_tags(monkeypatch)
-    _mock_listing_catalog(monkeypatch)
-
-    calls = []
-
-    async def fake_list_listing_tag_assignments(
-        listing_name="",
-        tag_name="",
-        page=1,
-        page_size=25,
-        group_by_listing=False,
-    ):
-        calls.append(
-            {
-                "listing_name": listing_name,
-                "tag_name": tag_name,
-                "page": page,
-                "page_size": page_size,
-                "group_by_listing": group_by_listing,
-            }
-        )
-        if group_by_listing:
-            return {
-                "items": [],
-                "grouped_items": [
-                    {
-                        "listing_id": "listing-1",
-                        "listing_name": "Example Farm",
-                        "latest_assigned_at": "2026-03-25T08:10:00Z",
-                        "tags": [{"tag_code": "microgreens"}],
-                    }
-                ],
-                "page": 1,
-                "page_size": 100,
-                "total": 1,
-            }
-        return {"items": [], "page": 1, "page_size": 25, "total": 0}
-
-    monkeypatch.setattr(
-        deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
-    )
+    _mock_listing_tag_matrix(monkeypatch)
     response = client.get("/listing-tags?selected_listing_id=listing-1")
     assert response.status_code == 200
     assert 'name="selected_tags__listing-1"' in response.text
     assert "Example Farm" in response.text
-    assert calls[1]["listing_name"] == "Example Farm"
-    assert calls[1]["group_by_listing"] is True
+    assert 'name="selected_tags__listing-1"' in response.text
+    assert 'value="microgreens"' in response.text
 
 
 def test_apply_listing_tag_matrix_updates_only_changed_rows(monkeypatch):
-    async def fake_list_admin_listings(listing_name="", page=1, page_size=25):
+    async def fake_list_listing_tag_matrix(
+        listing_name="",
+        tag_name="",
+        page=1,
+        page_size=25,
+        include_inactive_tags=False,
+    ):
         return {
+            "tags": [
+                {"tag_code": "microgreens", "tag_name": "Microgreens", "is_active": True},
+                {"tag_code": "flowers", "tag_name": "Flowers", "is_active": True},
+            ],
             "items": [
-                {"listing_id": "listing-1", "listing_name": "Example Farm"},
-                {"listing_id": "listing-2", "listing_name": "Beta Farm"},
+                {
+                    "listing_id": "listing-1",
+                    "display_name": "Example Farm",
+                    "assigned_tag_codes": ["microgreens"],
+                },
+                {
+                    "listing_id": "listing-2",
+                    "display_name": "Beta Farm",
+                    "assigned_tag_codes": [],
+                },
             ],
             "page": page,
             "page_size": page_size,
             "total": 2,
         }
 
-    async def fake_list_canonical_tags():
+    captured = {"updates": None}
+
+    async def fake_apply_listing_tag_matrix_updates(requested_by, reason_code, updates):
+        captured["updates"] = updates
+        assert requested_by == "admin@smallfarms"
+        assert reason_code == "ADMIN_TAXONOMY_UPDATE"
         return {
-            "items": [
-                {"tag_code": "microgreens", "tag_name": "Microgreens", "is_active": True},
-                {"tag_code": "flowers", "tag_name": "Flowers", "is_active": True},
-            ]
+            "total_rows": len(updates),
+            "success_count": 1,
+            "failure_count": 0,
+            "results": [
+                {
+                    "listing_id": "listing-1",
+                    "status": "updated",
+                    "tag_codes": ["flowers", "microgreens"],
+                }
+            ],
         }
 
-    async def fake_list_listing_tag_assignments(
-        listing_name="",
-        tag_name="",
-        page=1,
-        page_size=25,
-        group_by_listing=False,
-    ):
-        if group_by_listing and listing_name == "Example Farm":
-            return {
-                "items": [],
-                "grouped_items": [
-                    {
-                        "listing_id": "listing-1",
-                        "listing_name": "Example Farm",
-                        "tags": [{"tag_code": "microgreens"}],
-                    }
-                ],
-                "page": 1,
-                "page_size": 100,
-                "total": 1,
-            }
-        if group_by_listing and listing_name == "Beta Farm":
-            return {
-                "items": [],
-                "grouped_items": [],
-                "page": 1,
-                "page_size": 100,
-                "total": 0,
-            }
-        return {"items": [], "page": page, "page_size": page_size, "total": 0}
-
-    updated = []
-
-    async def fake_replace_listing_tag_assignments(listing_id, tag_codes, reason_code, requested_by):
-        updated.append((listing_id, tag_codes, reason_code, requested_by))
-        return {"ok": True}
-
-    monkeypatch.setattr(deps.platform_client, "list_admin_listings", fake_list_admin_listings)
-    monkeypatch.setattr(deps.platform_client, "list_canonical_tags", fake_list_canonical_tags)
     monkeypatch.setattr(
         deps.platform_client,
-        "list_listing_tag_assignments",
-        fake_list_listing_tag_assignments,
+        "list_listing_tag_matrix",
+        fake_list_listing_tag_matrix,
     )
     monkeypatch.setattr(
         deps.platform_client,
-        "replace_listing_tag_assignments",
-        fake_replace_listing_tag_assignments,
+        "apply_listing_tag_matrix_updates",
+        fake_apply_listing_tag_matrix_updates,
     )
 
     response = client.post(
@@ -464,6 +307,4 @@ def test_apply_listing_tag_matrix_updates_only_changed_rows(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert len(updated) == 1
-    assert updated[0][0] == "listing-1"
-    assert updated[0][1] == ["flowers", "microgreens"]
+    assert captured["updates"] == [{"listing_id": "listing-1", "tag_codes": ["flowers", "microgreens"]}]
