@@ -325,6 +325,9 @@ class PlatformApiClient:
             },
         )
 
+    async def list_canonical_tags(self) -> dict[str, Any]:
+        return await self._request("GET", "/v1/admin/tags")
+
     async def replace_listing_tag_assignments(
         self,
         listing_id: str,

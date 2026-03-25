@@ -44,6 +44,11 @@ def _render_listing_tags(
     group_by_listing: bool = False,
     items: list[dict] | None = None,
     grouped_items: list[dict] | None = None,
+    listing_options: list[dict] | None = None,
+    canonical_tags: list[dict] | None = None,
+    selected_listing_id: str = "",
+    selected_listing_name: str = "",
+    selected_listing_tag_codes: list[str] | None = None,
     api_log_items: list[dict] | None = None,
     listing_id: str = "",
     tag_codes_csv: str = "",
@@ -67,6 +72,11 @@ def _render_listing_tags(
             "group_by_listing": group_by_listing,
             "items": items or [],
             "grouped_items": grouped_items or [],
+            "listing_options": listing_options or [],
+            "canonical_tags": canonical_tags or [],
+            "selected_listing_id": selected_listing_id,
+            "selected_listing_name": selected_listing_name,
+            "selected_listing_tag_codes": selected_listing_tag_codes or [],
             "api_log_items": api_log_items or [],
             "has_prev_page": page > 1,
             "has_next_page": page < total_pages,
@@ -89,6 +99,65 @@ def _assignment_error_message(exc: PlatformApiError) -> str:
     return f"Tag assignment failed: {exc.message}"
 
 
+def _tag_catalog_error_message(exc: PlatformApiError) -> str:
+    if exc.status_code == 503:
+        return "database_unavailable: canonical tag catalog unavailable."
+    if exc.status_code == 404:
+        return "Tag catalog endpoint not found. Confirm GET /v1/admin/tags is deployed."
+    return f"Failed to load canonical tags: {exc.message}"
+
+
+def _normalize_canonical_tags(response: dict) -> list[dict]:
+    raw = response.get("items")
+    if not isinstance(raw, list):
+        raw = response.get("tags")
+    if not isinstance(raw, list):
+        return []
+    normalized: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        code = str(entry.get("tag_code") or entry.get("code") or "").strip()
+        name = str(entry.get("tag_name") or entry.get("tag_label") or entry.get("label") or "").strip()
+        if not code:
+            continue
+        normalized.append(
+            {
+                "tag_code": code,
+                "tag_name": name or code,
+                "is_active": bool(entry.get("is_active", True)),
+            }
+        )
+    normalized.sort(key=lambda item: item["tag_name"].lower())
+    return normalized
+
+
+def _listing_options_from_grouped(grouped_items: list[dict]) -> list[dict]:
+    options: list[dict] = []
+    for entry in grouped_items:
+        listing_id = str(entry.get("listing_id") or "").strip()
+        if not listing_id:
+            continue
+        tags_raw = entry.get("tags")
+        selected_codes: list[str] = []
+        if isinstance(tags_raw, list):
+            for tag in tags_raw:
+                if not isinstance(tag, dict):
+                    continue
+                code = str(tag.get("tag_code") or "").strip()
+                if code:
+                    selected_codes.append(code)
+        options.append(
+            {
+                "listing_id": listing_id,
+                "listing_name": str(entry.get("listing_name") or listing_id),
+                "latest_assigned_at": str(entry.get("latest_assigned_at") or ""),
+                "selected_tag_codes": selected_codes,
+            }
+        )
+    return options
+
+
 def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
     matched: list[dict] = []
     for entry in api_log_store.list_newest_first():
@@ -108,12 +177,17 @@ def _listing_tag_api_logs(limit: int = 50) -> list[dict]:
 async def listing_tags_page(request: Request):
     listing_name = (request.query_params.get("listing_name") or "").strip()
     tag_name = (request.query_params.get("tag_name") or "").strip()
+    selected_listing_id = (request.query_params.get("selected_listing_id") or "").strip()
     page = _parse_int(request.query_params.get("page"), DEFAULT_PAGE, 1)
     page_size = _parse_int(request.query_params.get("page_size"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE)
     group_by_listing = _parse_bool(request.query_params.get("group_by_listing"), False)
 
     items: list[dict] = []
     grouped_items: list[dict] = []
+    listing_options: list[dict] = []
+    canonical_tags: list[dict] = []
+    selected_listing_name = ""
+    selected_listing_tag_codes: list[str] = []
     total = 0
     response_page = page
     response_page_size = page_size
@@ -149,6 +223,42 @@ async def listing_tags_page(request: Request):
         )
         level = "error"
 
+    try:
+        listing_selector_response = await platform_client.list_listing_tag_assignments(
+            listing_name=listing_name,
+            tag_name="",
+            page=1,
+            page_size=100,
+            group_by_listing=True,
+        )
+        selector_grouped = listing_selector_response.get("grouped_items", [])
+        if isinstance(selector_grouped, list):
+            listing_options = _listing_options_from_grouped(
+                [entry for entry in selector_grouped if isinstance(entry, dict)]
+            )
+    except PlatformApiError as exc:
+        if not message:
+            message = (
+                "database_unavailable: listing selector unavailable."
+                if exc.status_code == 503
+                else f"Failed to load listing selector options: {exc.message}"
+            )
+            level = "error"
+
+    try:
+        canonical_tags = _normalize_canonical_tags(await platform_client.list_canonical_tags())
+    except PlatformApiError as exc:
+        if not message:
+            message = _tag_catalog_error_message(exc)
+            level = "error"
+
+    if selected_listing_id and listing_options:
+        for option in listing_options:
+            if option["listing_id"] == selected_listing_id:
+                selected_listing_name = option["listing_name"]
+                selected_listing_tag_codes = option["selected_tag_codes"]
+                break
+
     total_pages = (
         (total + response_page_size - 1) // response_page_size if response_page_size > 0 else 1
     )
@@ -167,6 +277,11 @@ async def listing_tags_page(request: Request):
         group_by_listing=group_by_listing,
         items=items,
         grouped_items=grouped_items,
+        listing_options=listing_options,
+        canonical_tags=canonical_tags,
+        selected_listing_id=selected_listing_id,
+        selected_listing_name=selected_listing_name,
+        selected_listing_tag_codes=selected_listing_tag_codes,
         api_log_items=_listing_tag_api_logs(),
     )
 
@@ -175,15 +290,18 @@ async def listing_tags_page(request: Request):
 async def replace_listing_tags(
     request: Request,
     listing_id: str = Form(""),
+    tag_codes: list[str] = Form([]),
     tag_codes_csv: str = Form(""),
     reason_code: str = Form(""),
     requested_by: str = Form(""),
 ):
-    tag_codes = [item.strip() for item in tag_codes_csv.split(",") if item.strip()]
-    if not listing_id.strip() or not reason_code.strip() or not requested_by.strip() or not tag_codes:
+    parsed_tag_codes = [item.strip() for item in tag_codes if item.strip()]
+    if not parsed_tag_codes and tag_codes_csv.strip():
+        parsed_tag_codes = [item.strip() for item in tag_codes_csv.split(",") if item.strip()]
+    if not listing_id.strip() or not reason_code.strip() or not requested_by.strip():
         return _render_listing_tags(
             request,
-            "listing_id, tag_codes, reason_code, and requested_by are required.",
+            "listing_id, reason_code, and requested_by are required.",
             "error",
             listing_id=listing_id,
             tag_codes_csv=tag_codes_csv,
@@ -195,7 +313,7 @@ async def replace_listing_tags(
     try:
         result = await platform_client.replace_listing_tag_assignments(
             listing_id=listing_id,
-            tag_codes=tag_codes,
+            tag_codes=parsed_tag_codes,
             reason_code=reason_code,
             requested_by=requested_by,
         )
