@@ -258,3 +258,19 @@ Python web admin app for moderation operations, escalation handling, policy exec
 4. Understood next steps (remaining TODOs):
    1. Consider adding direct “open listing management” shortcuts from assignment rows/groups for faster triage workflows.
    2. Monitor grouped projection payload size at higher page sizes and tune default page size if rendering performance drops.
+
+## Main push update (2026-03-25 07:19 UTC)
+
+1. TODOs completed since last push:
+   1. Added a full API request/response log panel to the bottom of `/listing-tags` for listing-tag assignment reads/writes.
+   2. Extended outbound API logging to include GET requests (not only POST) so read failures like endpoint 404s are visible in Admin UI diagnostics.
+   3. Added request query capture in API logs to show exact listing/tag filter parameters sent upstream.
+   4. Added regression coverage ensuring listing-tag page renders related API log entries, including Not Found responses.
+2. Git build references:
+   1. `777023b`
+3. New understandings/learnings:
+   1. Diagnosing list/read endpoint issues requires method-agnostic logging; POST-only logging leaves critical visibility gaps for read-path failures.
+   2. Inline page diagnostics significantly reduce troubleshooting round trips compared with switching to a separate global log page.
+4. Understood next steps (remaining TODOs):
+   1. Consider adding a clear button/scope toggle for listing-tag diagnostics if log volume grows during active investigations.
+   2. Optionally mirror the same inline diagnostics pattern to other admin pages that depend on newly evolving backend contracts.
